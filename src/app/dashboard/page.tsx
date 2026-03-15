@@ -1,0 +1,282 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Lever, FulcrumStatus } from '@/lib/types';
+import { getLevers, loadSampleData, detectSequenceViolations } from '@/lib/store';
+import Link from 'next/link';
+
+const statusColors: Record<FulcrumStatus, string> = {
+  verified: 'bg-verified',
+  assumed: 'bg-assumed',
+  at_risk: 'bg-at-risk',
+  absent: 'bg-absent',
+};
+
+const statusLabels: Record<FulcrumStatus, string> = {
+  verified: 'Verified',
+  assumed: 'Assumed',
+  at_risk: 'At Risk',
+  absent: 'Absent',
+};
+
+export default function DashboardPage() {
+  const [levers, setLevers] = useState<Lever[]>([]);
+  const [sortBy, setSortBy] = useState<'score' | 'name' | 'category'>('score');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  useEffect(() => {
+    setLevers(getLevers());
+  }, []);
+
+  const handleLoadSample = () => {
+    const samples = loadSampleData();
+    setLevers(samples);
+  };
+
+  const sortedLevers = [...levers].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    if (sortBy === 'score') return (a.effectiveLeverage - b.effectiveLeverage) * dir;
+    if (sortBy === 'name') return a.name.localeCompare(b.name) * dir;
+    return a.category.localeCompare(b.category) * dir;
+  });
+
+  const handleSort = (col: 'score' | 'name' | 'category') => {
+    if (sortBy === col) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortDir(col === 'score' ? 'desc' : 'asc');
+    }
+  };
+
+  // Compute fulcrum health averages
+  const fulcrumHealth = (type: 'material' | 'epistemic' | 'relational') => {
+    if (levers.length === 0) return { verified: 0, assumed: 0, at_risk: 0, absent: 0, score: 0 };
+    const counts = { verified: 0, assumed: 0, at_risk: 0, absent: 0 };
+    levers.forEach((l) => counts[l.fulcrums[type].status]++);
+    const score = Math.round(
+      ((counts.verified * 100 + counts.assumed * 60 + counts.at_risk * 25) / levers.length)
+    );
+    return { ...counts, score };
+  };
+
+  const materialHealth = fulcrumHealth('material');
+  const epistemicHealth = fulcrumHealth('epistemic');
+  const relationalHealth = fulcrumHealth('relational');
+
+  // Collect all alerts
+  const alerts: { lever: string; message: string }[] = [];
+  levers.forEach((l) => {
+    detectSequenceViolations(l).forEach((msg) => {
+      alerts.push({ lever: l.name, message: msg });
+    });
+    if (l.effectiveLeverage === 0) {
+      alerts.push({ lever: l.name, message: 'Effective leverage is ZERO. A property has collapsed.' });
+    }
+  });
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted text-sm mt-1">Your leverage system at a glance</p>
+        </div>
+        {levers.length === 0 && (
+          <motion.button
+            onClick={handleLoadSample}
+            className="px-4 py-2 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            Load Sample Data
+          </motion.button>
+        )}
+      </div>
+
+      {/* Fulcrum Health Panel */}
+      <div className="grid grid-cols-3 gap-6">
+        <FulcrumHealthBar label="Material" subtitle="Can you survive?" color="bg-material" health={materialHealth} chapter="Ch. 7" />
+        <FulcrumHealthBar label="Epistemic" subtitle="Can you prove it?" color="bg-epistemic" health={epistemicHealth} chapter="Ch. 8" />
+        <FulcrumHealthBar label="Relational" subtitle="Do they trust it?" color="bg-relational" health={relationalHealth} chapter="Ch. 9" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-6">
+        {/* Lever Portfolio - takes 2 cols */}
+        <div className="col-span-2 bg-surface rounded-xl border border-white/5 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-xl font-semibold">Lever Portfolio</h2>
+            <Link href="/workshop">
+              <span className="text-accent text-sm hover:underline">+ Add Lever</span>
+            </Link>
+          </div>
+
+          {levers.length === 0 ? (
+            <div className="text-center py-12 text-muted">
+              <p className="text-lg mb-2">No levers yet</p>
+              <p className="text-sm">Create your first lever in the Workshop or load sample data.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted text-xs uppercase tracking-wider border-b border-white/5">
+                    <th className="text-left py-2 cursor-pointer hover:text-foreground" onClick={() => handleSort('name')}>
+                      Name {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="text-left py-2 cursor-pointer hover:text-foreground" onClick={() => handleSort('category')}>
+                      Category {sortBy === 'category' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="text-center py-2">R</th>
+                    <th className="text-center py-2">L</th>
+                    <th className="text-center py-2">Q</th>
+                    <th className="text-right py-2 cursor-pointer hover:text-foreground" onClick={() => handleSort('score')}>
+                      R&times;L&times;Q {sortBy === 'score' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="text-center py-2">Fulcrums</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <AnimatePresence>
+                    {sortedLevers.map((lever) => (
+                      <motion.tr
+                        key={lever.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                      >
+                        <td className="py-3">
+                          <Link href={`/workshop?edit=${lever.id}`} className="text-foreground hover:text-accent transition-colors">
+                            {lever.name}
+                          </Link>
+                        </td>
+                        <td className="py-3 text-muted">{lever.category}</td>
+                        <td className="py-3 text-center font-mono text-rigidity">{lever.properties.r}</td>
+                        <td className="py-3 text-center font-mono text-length">{lever.properties.l}</td>
+                        <td className="py-3 text-center font-mono text-quality">{lever.properties.q}</td>
+                        <td className="py-3 text-right font-mono font-bold text-accent">{lever.effectiveLeverage}</td>
+                        <td className="py-3">
+                          <div className="flex justify-center gap-1.5">
+                            <span className={`w-2.5 h-2.5 rounded-full ${statusColors[lever.fulcrums.material.status]}`} title={`Material: ${statusLabels[lever.fulcrums.material.status]}`} />
+                            <span className={`w-2.5 h-2.5 rounded-full ${statusColors[lever.fulcrums.epistemic.status]}`} title={`Epistemic: ${statusLabels[lever.fulcrums.epistemic.status]}`} />
+                            <span className={`w-2.5 h-2.5 rounded-full ${statusColors[lever.fulcrums.relational.status]}`} title={`Relational: ${statusLabels[lever.fulcrums.relational.status]}`} />
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Right column: This Week + Alerts */}
+        <div className="space-y-6">
+          {/* This Week Panel */}
+          <div className="bg-surface rounded-xl border border-white/5 p-6">
+            <h2 className="font-heading text-xl font-semibold mb-4">This Week</h2>
+            <div className="text-center py-8 text-muted">
+              <p className="text-sm">AI-powered weekly review</p>
+              <p className="text-xs mt-1 text-muted/50">Coming soon — Ch. 11</p>
+            </div>
+          </div>
+
+          {/* Alert Panel */}
+          <div className="bg-surface rounded-xl border border-white/5 p-6">
+            <h2 className="font-heading text-xl font-semibold mb-4 flex items-center gap-2">
+              Alerts
+              {alerts.length > 0 && (
+                <span className="text-xs bg-at-risk/20 text-at-risk px-2 py-0.5 rounded-full font-mono">
+                  {alerts.length}
+                </span>
+              )}
+            </h2>
+            {alerts.length === 0 ? (
+              <p className="text-muted text-sm text-center py-4">No alerts. System stable.</p>
+            ) : (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {alerts.map((alert, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="p-3 bg-at-risk/5 border border-at-risk/20 rounded-lg"
+                  >
+                    <p className="text-xs font-mono text-at-risk/70 mb-1">{alert.lever}</p>
+                    <p className="text-xs text-foreground/80">{alert.message}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FulcrumHealthBar({
+  label,
+  subtitle,
+  color,
+  health,
+  chapter,
+}: {
+  label: string;
+  subtitle: string;
+  color: string;
+  health: { verified: number; assumed: number; at_risk: number; absent: number; score: number };
+  chapter: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface rounded-xl border border-white/5 p-6"
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="font-heading text-lg font-semibold">{label}</h3>
+          <p className="text-muted text-xs">{subtitle}</p>
+        </div>
+        <span className="text-[10px] font-mono text-muted/40">{chapter}</span>
+      </div>
+
+      {/* Vertical bar */}
+      <div className="flex items-end justify-center mb-4">
+        <div className="w-12 h-32 bg-white/5 rounded-t-lg relative overflow-hidden">
+          <motion.div
+            className={`absolute bottom-0 left-0 right-0 ${color} rounded-t-lg`}
+            initial={{ height: 0 }}
+            animate={{ height: `${health.score}%` }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          />
+        </div>
+      </div>
+
+      <div className="text-center mb-3">
+        <span className="font-mono text-2xl font-bold text-foreground">{health.score}%</span>
+      </div>
+
+      {/* Status badges */}
+      <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+        <StatusBadge label="Verified" count={health.verified} color="text-verified" />
+        <StatusBadge label="Assumed" count={health.assumed} color="text-assumed" />
+        <StatusBadge label="At Risk" count={health.at_risk} color="text-at-risk" />
+        <StatusBadge label="Absent" count={health.absent} color="text-muted" />
+      </div>
+    </motion.div>
+  );
+}
+
+function StatusBadge({ label, count, color }: { label: string; count: number; color: string }) {
+  return (
+    <div className="flex items-center gap-1.5 bg-white/[0.02] rounded px-2 py-1">
+      <span className={`font-mono font-bold ${color}`}>{count}</span>
+      <span className="text-muted">{label}</span>
+    </div>
+  );
+}
