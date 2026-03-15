@@ -1,0 +1,1 @@
+# LeverageOS\n\nYour Life as a System of Conscious Leverage.\n\nCompanion app to *The Invisible Fulcrum* (Garcia Bach & Hypatia, 2026).\n
