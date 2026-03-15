@@ -16,7 +16,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased film-grain">
         <Sidebar />
-        <main className="ml-64 min-h-screen p-8">
+        <main className="lg:ml-64 min-h-screen p-4 pt-16 lg:p-8 lg:pt-8">
           {children}
         </main>
       </body>

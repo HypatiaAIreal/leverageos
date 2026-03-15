@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon, chapter: 'Overview' },
@@ -14,57 +15,91 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-surface border-r border-white/5 flex flex-col z-50">
-      <div className="p-6 border-b border-white/5">
-        <Link href="/dashboard">
-          <h1 className="font-heading text-2xl font-bold text-accent tracking-wide">
-            LeverageOS
-          </h1>
-          <p className="text-muted text-xs mt-1 font-mono">R &times; L &times; Q</p>
-        </Link>
-      </div>
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="fixed top-4 left-4 z-[60] lg:hidden w-10 h-10 flex items-center justify-center rounded-lg bg-surface border border-white/10"
+        aria-label="Toggle menu"
+      >
+        <svg className="w-5 h-5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          {mobileOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          )}
+        </svg>
+      </button>
 
-      <nav className="flex-1 py-4 px-3 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-          return (
-            <Link key={item.href} href={item.href}>
-              <motion.div
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors group relative ${
-                  isActive
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-muted hover:text-foreground hover:bg-white/5'
-                }`}
-                whileHover={{ x: 2 }}
-                transition={{ duration: 0.15 }}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNav"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-accent rounded-full"
-                    transition={{ duration: 0.2 }}
-                  />
-                )}
-                <item.icon active={isActive} />
-                <span className="font-medium">{item.label}</span>
-                <span className="ml-auto text-[10px] text-muted/50 font-mono">{item.chapter}</span>
-              </motion.div>
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Mobile overlay */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[55] lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      <div className="p-4 border-t border-white/5">
-        <p className="text-[10px] text-muted/40 font-mono text-center">
-          The Invisible Fulcrum
-        </p>
-        <p className="text-[10px] text-muted/30 font-mono text-center">
-          Garcia Bach &amp; Hypatia, 2026
-        </p>
-      </div>
-    </aside>
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 h-screen w-64 bg-surface border-r border-white/5 flex flex-col z-[56] transition-transform duration-300 lg:translate-x-0 ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-6 border-b border-white/5">
+          <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
+            <h1 className="font-heading text-2xl font-bold text-accent tracking-wide">
+              LeverageOS
+            </h1>
+            <p className="text-muted text-xs mt-1 font-mono">R &times; L &times; Q</p>
+          </Link>
+        </div>
+
+        <nav className="flex-1 py-4 px-3 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            return (
+              <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
+                <motion.div
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors group relative ${
+                    isActive
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-muted hover:text-foreground hover:bg-white/5'
+                  }`}
+                  whileHover={{ x: 2 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeNav"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-accent rounded-full"
+                      transition={{ duration: 0.2 }}
+                    />
+                  )}
+                  <item.icon active={isActive} />
+                  <span className="font-medium">{item.label}</span>
+                  <span className="ml-auto text-[10px] text-muted/50 font-mono">{item.chapter}</span>
+                </motion.div>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-white/5">
+          <p className="text-[10px] text-muted/40 font-mono text-center">
+            The Invisible Fulcrum
+          </p>
+          <p className="text-[10px] text-muted/30 font-mono text-center">
+            Garcia Bach &amp; Hypatia, 2026
+          </p>
+        </div>
+      </aside>
+    </>
   );
 }
 
