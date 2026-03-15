@@ -51,7 +51,7 @@ VIEW 5 EVOLUTION TRACKER: History charts. Lever growth. Milestones. Pattern dete
 ### AI Integration
 Weekly Review /api/review: quick win, bottleneck, sequence alerts, fulcrum trap warnings, celebrations.
 On-Demand /api/diagnose-lever: deep analysis of any lever.
-Model: claude-sonnet-4-6-20250514
+Model: claude-sonnet-4-6
 
 ### Design System
 Colors: bg #0a0a0f, surface #12121a, text #e8e4df, muted #6a6570, accent #c4a35a
