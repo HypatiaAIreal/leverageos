@@ -152,7 +152,7 @@ function WorkshopPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Left: Lever list */}
         <div className="bg-surface rounded-xl border border-white/5 p-4">
           <h3 className="font-heading text-sm font-semibold text-muted mb-3 uppercase tracking-wider">Your Levers</h3>
@@ -182,7 +182,7 @@ function WorkshopPage() {
         </div>
 
         {/* Center + Right: Editor */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Name, Description, Category */}
           <div className="bg-surface rounded-xl border border-white/5 p-6 space-y-4">
             <input
@@ -316,6 +316,9 @@ function WorkshopPage() {
             )}
           </AnimatePresence>
 
+          {/* AI Diagnosis */}
+          {isEditing && <LeverDiagnosis lever={currentLever} />}
+
           {/* Save / Delete */}
           <div className="flex items-center gap-3">
             <motion.button
@@ -409,6 +412,140 @@ function PropertySlider({
         <span>5</span>
         <span>10</span>
       </div>
+    </div>
+  );
+}
+
+interface DiagnosisData {
+  diagnosis: string;
+  propertyAnalysis: { rigidity: string; length: string; quality: string };
+  fulcrumAnalysis: { material: string; epistemic: string; relational: string };
+  nextAction: string;
+  risk: string;
+  potential: string;
+}
+
+function LeverDiagnosis({ lever }: { lever: Lever }) {
+  const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDiagnose = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/diagnose-lever', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lever }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to diagnose');
+      }
+      setDiagnosis(await res.json());
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-surface rounded-xl border border-white/5 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-heading text-lg font-semibold">AI Diagnosis</h3>
+        <motion.button
+          onClick={handleDiagnose}
+          disabled={loading}
+          className="px-3 py-1.5 bg-accent/20 text-accent border border-accent/30 rounded-lg text-xs font-medium hover:bg-accent/30 transition-colors disabled:opacity-50"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          {loading ? 'Analyzing...' : 'Diagnose This Lever'}
+        </motion.button>
+      </div>
+
+      {loading && (
+        <div className="text-center py-6">
+          <motion.div
+            className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full mx-auto"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          />
+          <p className="text-muted text-xs mt-2">Deep analysis in progress...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="space-y-2">
+          <p className="text-at-risk text-xs">{error}</p>
+          <button onClick={handleDiagnose} className="text-accent text-xs underline">Retry</button>
+        </div>
+      )}
+
+      {!loading && !error && !diagnosis && (
+        <p className="text-muted text-xs text-center py-4">Click &quot;Diagnose This Lever&quot; for AI-powered deep analysis.</p>
+      )}
+
+      {diagnosis && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4 text-xs"
+        >
+          <div>
+            <p className="text-muted font-mono uppercase tracking-wider text-[10px] mb-1">Diagnosis</p>
+            <p className="text-foreground/90">{diagnosis.diagnosis}</p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white/[0.02] rounded-lg p-3">
+              <p className="text-rigidity font-mono text-[10px] mb-1">Rigidity</p>
+              <p className="text-foreground/70">{diagnosis.propertyAnalysis.rigidity}</p>
+            </div>
+            <div className="bg-white/[0.02] rounded-lg p-3">
+              <p className="text-length font-mono text-[10px] mb-1">Length</p>
+              <p className="text-foreground/70">{diagnosis.propertyAnalysis.length}</p>
+            </div>
+            <div className="bg-white/[0.02] rounded-lg p-3">
+              <p className="text-quality font-mono text-[10px] mb-1">Quality</p>
+              <p className="text-foreground/70">{diagnosis.propertyAnalysis.quality}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-material/5 rounded-lg p-3 border border-material/10">
+              <p className="text-material font-mono text-[10px] mb-1">Material</p>
+              <p className="text-foreground/70">{diagnosis.fulcrumAnalysis.material}</p>
+            </div>
+            <div className="bg-epistemic/5 rounded-lg p-3 border border-epistemic/10">
+              <p className="text-epistemic font-mono text-[10px] mb-1">Epistemic</p>
+              <p className="text-foreground/70">{diagnosis.fulcrumAnalysis.epistemic}</p>
+            </div>
+            <div className="bg-relational/5 rounded-lg p-3 border border-relational/10">
+              <p className="text-relational font-mono text-[10px] mb-1">Relational</p>
+              <p className="text-foreground/70">{diagnosis.fulcrumAnalysis.relational}</p>
+            </div>
+          </div>
+
+          <div className="bg-accent/5 border border-accent/10 rounded-lg p-3">
+            <p className="text-accent font-mono text-[10px] mb-1">Next Action</p>
+            <p className="text-foreground/90">{diagnosis.nextAction}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-at-risk/5 border border-at-risk/10 rounded-lg p-3">
+              <p className="text-at-risk font-mono text-[10px] mb-1">Risk</p>
+              <p className="text-foreground/70">{diagnosis.risk}</p>
+            </div>
+            <div className="bg-verified/5 border border-verified/10 rounded-lg p-3">
+              <p className="text-verified font-mono text-[10px] mb-1">Potential</p>
+              <p className="text-foreground/70">{diagnosis.potential}</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

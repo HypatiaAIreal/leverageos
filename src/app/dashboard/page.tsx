@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Lever, FulcrumStatus } from '@/lib/types';
 import { getLevers, loadSampleData, detectSequenceViolations } from '@/lib/store';
 import Link from 'next/link';
+import { useOnboarding, OnboardingModal } from '@/components/Onboarding';
+import DataPortability from '@/components/DataPortability';
+import PageTransition from '@/components/PageTransition';
 
 const statusColors: Record<FulcrumStatus, string> = {
   verified: 'bg-verified',
@@ -24,10 +27,13 @@ export default function DashboardPage() {
   const [levers, setLevers] = useState<Lever[]>([]);
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'category'>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const { showOnboarding, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
     setLevers(getLevers());
   }, []);
+
+  const refreshLevers = () => setLevers(getLevers());
 
   const handleLoadSample = () => {
     const samples = loadSampleData();
@@ -77,34 +83,42 @@ export default function DashboardPage() {
   });
 
   return (
+    <PageTransition>
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <AnimatePresence>
+        {showOnboarding && <OnboardingModal onComplete={completeOnboarding} />}
+      </AnimatePresence>
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-heading text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted text-sm mt-1">Your leverage system at a glance</p>
         </div>
-        {levers.length === 0 && (
-          <motion.button
-            onClick={handleLoadSample}
-            className="px-4 py-2 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            Load Sample Data
-          </motion.button>
-        )}
+        <div className="flex items-center gap-2">
+          <DataPortability onImport={refreshLevers} />
+          {levers.length === 0 && (
+            <motion.button
+              onClick={handleLoadSample}
+              className="px-4 py-2 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Load Sample Data
+            </motion.button>
+          )}
+        </div>
       </div>
 
       {/* Fulcrum Health Panel */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <FulcrumHealthBar label="Material" subtitle="Can you survive?" color="bg-material" health={materialHealth} chapter="Ch. 7" />
         <FulcrumHealthBar label="Epistemic" subtitle="Can you prove it?" color="bg-epistemic" health={epistemicHealth} chapter="Ch. 8" />
         <FulcrumHealthBar label="Relational" subtitle="Do they trust it?" color="bg-relational" health={relationalHealth} chapter="Ch. 9" />
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lever Portfolio - takes 2 cols */}
-        <div className="col-span-2 bg-surface rounded-xl border border-white/5 p-6">
+        <div className="lg:col-span-2 bg-surface rounded-xl border border-white/5 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-semibold">Lever Portfolio</h2>
             <Link href="/workshop">
@@ -174,14 +188,8 @@ export default function DashboardPage() {
 
         {/* Right column: This Week + Alerts */}
         <div className="space-y-6">
-          {/* This Week Panel */}
-          <div className="bg-surface rounded-xl border border-white/5 p-6">
-            <h2 className="font-heading text-xl font-semibold mb-4">This Week</h2>
-            <div className="text-center py-8 text-muted">
-              <p className="text-sm">AI-powered weekly review</p>
-              <p className="text-xs mt-1 text-muted/50">Coming soon — Ch. 11</p>
-            </div>
-          </div>
+          {/* This Week Panel - AI Review */}
+          <WeeklyReviewPanel levers={levers} />
 
           {/* Alert Panel */}
           <div className="bg-surface rounded-xl border border-white/5 p-6">
@@ -215,6 +223,7 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 }
 
@@ -277,6 +286,112 @@ function StatusBadge({ label, count, color }: { label: string; count: number; co
     <div className="flex items-center gap-1.5 bg-white/[0.02] rounded px-2 py-1">
       <span className={`font-mono font-bold ${color}`}>{count}</span>
       <span className="text-muted">{label}</span>
+    </div>
+  );
+}
+
+interface ReviewData {
+  quickWin: string;
+  bottleneck: string;
+  sequenceAlerts: string[];
+  fulcrumTraps: string[];
+  celebration: string;
+}
+
+function WeeklyReviewPanel({ levers }: { levers: Lever[] }) {
+  const [review, setReview] = useState<ReviewData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleReview = async () => {
+    if (levers.length === 0) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ levers }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to get review');
+      }
+      const data = await res.json();
+      setReview(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-surface rounded-xl border border-white/5 p-6">
+      <h2 className="font-heading text-xl font-semibold mb-4">This Week</h2>
+      {!review && !loading && !error && (
+        <div className="text-center py-4">
+          <p className="text-muted text-xs mb-3">AI-powered strategic review</p>
+          <motion.button
+            onClick={handleReview}
+            disabled={levers.length === 0}
+            className="px-3 py-1.5 bg-accent/20 text-accent border border-accent/30 rounded-lg text-xs font-medium hover:bg-accent/30 transition-colors disabled:opacity-30"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            Run Review
+          </motion.button>
+        </div>
+      )}
+      {loading && (
+        <div className="text-center py-6">
+          <motion.div
+            className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full mx-auto"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          />
+          <p className="text-muted text-xs mt-2">Analyzing your leverage system...</p>
+        </div>
+      )}
+      {error && (
+        <div className="space-y-2">
+          <p className="text-at-risk text-xs">{error}</p>
+          <button onClick={handleReview} className="text-accent text-xs underline">Retry</button>
+        </div>
+      )}
+      {review && (
+        <div className="space-y-3 text-xs">
+          <div>
+            <p className="text-muted font-mono uppercase tracking-wider text-[10px] mb-1">Quick Win</p>
+            <p className="text-foreground/90">{review.quickWin}</p>
+          </div>
+          <div>
+            <p className="text-muted font-mono uppercase tracking-wider text-[10px] mb-1">Bottleneck</p>
+            <p className="text-foreground/90">{review.bottleneck}</p>
+          </div>
+          {review.sequenceAlerts.length > 0 && (
+            <div>
+              <p className="text-at-risk font-mono uppercase tracking-wider text-[10px] mb-1">Sequence Alerts</p>
+              {review.sequenceAlerts.map((a, i) => (
+                <p key={i} className="text-foreground/70 ml-2">- {a}</p>
+              ))}
+            </div>
+          )}
+          {review.fulcrumTraps.length > 0 && (
+            <div>
+              <p className="text-assumed font-mono uppercase tracking-wider text-[10px] mb-1">Fulcrum Traps</p>
+              {review.fulcrumTraps.map((t, i) => (
+                <p key={i} className="text-foreground/70 ml-2">- {t}</p>
+              ))}
+            </div>
+          )}
+          <div>
+            <p className="text-verified font-mono uppercase tracking-wider text-[10px] mb-1">Celebration</p>
+            <p className="text-foreground/90">{review.celebration}</p>
+          </div>
+          <button onClick={handleReview} className="text-accent text-[10px] underline mt-2">Refresh</button>
+        </div>
+      )}
     </div>
   );
 }
