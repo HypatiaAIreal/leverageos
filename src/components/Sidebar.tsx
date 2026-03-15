@@ -11,6 +11,7 @@ const navItems = [
   { href: '/fulcrum-map', label: 'Fulcrum Map', icon: MapIcon, chapter: 'Ch. 7-9' },
   { href: '/sequence', label: 'Sequence Analyzer', icon: SequenceIcon, chapter: 'Ch. 10' },
   { href: '/evolution', label: 'Evolution Tracker', icon: EvolutionIcon, chapter: 'Growth' },
+  { href: '/help', label: 'Help & Reference', icon: HelpIcon, chapter: 'Guide' },
 ];
 
 export default function Sidebar() {
@@ -90,7 +91,19 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
+        <div className="p-4 border-t border-white/5 space-y-2">
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              window.location.href = '/login';
+            }}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs text-muted/60 hover:text-at-risk hover:bg-white/5 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+            Sign Out
+          </button>
           <p className="text-[10px] text-muted/40 font-mono text-center">
             The Invisible Fulcrum
           </p>
@@ -139,6 +152,14 @@ function EvolutionIcon({ active }: { active: boolean }) {
   return (
     <svg className={`w-4 h-4 ${active ? 'text-accent' : 'text-muted'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+    </svg>
+  );
+}
+
+function HelpIcon({ active }: { active: boolean }) {
+  return (
+    <svg className={`w-4 h-4 ${active ? 'text-accent' : 'text-muted'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
     </svg>
   );
 }

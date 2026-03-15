@@ -234,6 +234,7 @@ function WorkshopPage() {
               <PropertySlider
                 label="Rigidity"
                 subtitle="Resistance to breaking under pressure"
+                tooltip="How shockproof is this lever? Can it survive market changes, competition, or personal crises without snapping? Rate 1 (fragile) to 10 (unbreakable)."
                 value={currentLever.properties.r}
                 onChange={(v) => updateProperty('r', v)}
                 color="rigidity"
@@ -242,6 +243,7 @@ function WorkshopPage() {
               <PropertySlider
                 label="Length"
                 subtitle="Reach and amplification"
+                tooltip="How far does this lever reach? What's the time horizon and number of people it touches? Rate 1 (local/short-term) to 10 (global/permanent)."
                 value={currentLever.properties.l}
                 onChange={(v) => updateProperty('l', v)}
                 color="length"
@@ -250,6 +252,7 @@ function WorkshopPage() {
               <PropertySlider
                 label="Quality"
                 subtitle="Excellence of core substance"
+                tooltip="How excellent is the underlying work? Is it genuinely best-in-class or held together with shortcuts? Rate 1 (minimal viable) to 10 (world-class)."
                 value={currentLever.properties.q}
                 onChange={(v) => updateProperty('q', v)}
                 color="quality"
@@ -265,6 +268,7 @@ function WorkshopPage() {
             <FulcrumEditor
               label="Material Fulcrum"
               subtitle="Can you survive while this lever operates?"
+              tooltip="Financial runway, living costs, basic stability. If this lever threatens your survival, the fulcrum is absent. Verified = specific evidence (e.g., 'Bank statement shows 6 months runway')."
               color="material"
               chapter="Ch. 7"
               state={currentLever.fulcrums.material}
@@ -276,6 +280,7 @@ function WorkshopPage() {
             <FulcrumEditor
               label="Epistemic Fulcrum"
               subtitle="Can you prove this lever's credibility?"
+              tooltip="Evidence of credibility: published work, customer data, peer review, external validation. 'I think it's good' is not epistemic proof. Requires EVIDENCE, not belief."
               color="epistemic"
               chapter="Ch. 8"
               state={currentLever.fulcrums.epistemic}
@@ -287,6 +292,7 @@ function WorkshopPage() {
             <FulcrumEditor
               label="Relational Fulcrum"
               subtitle="Does the target audience trust this lever?"
+              tooltip="Social proof, reputation, relationships with the people who matter. Do the right people know about this lever? Do they trust it? Testimonials, referrals, and public endorsements count."
               color="relational"
               chapter="Ch. 9"
               state={currentLever.fulcrums.relational}
@@ -362,6 +368,7 @@ function WorkshopPage() {
 function PropertySlider({
   label,
   subtitle,
+  tooltip,
   value,
   onChange,
   color,
@@ -369,11 +376,13 @@ function PropertySlider({
 }: {
   label: string;
   subtitle: string;
+  tooltip?: string;
   value: number;
   onChange: (v: number) => void;
   color: string;
   chapter: string;
 }) {
+  const [showTip, setShowTip] = useState(false);
   const colorClasses: Record<string, string> = {
     rigidity: 'accent-rigidity',
     length: 'accent-length',
@@ -383,9 +392,25 @@ function PropertySlider({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <div>
+        <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium">{label}</span>
-          <span className="text-xs text-muted ml-2">{subtitle}</span>
+          {tooltip && (
+            <div className="relative">
+              <button
+                onClick={() => setShowTip(!showTip)}
+                className="w-4 h-4 rounded-full bg-white/10 text-muted hover:text-foreground hover:bg-white/20 flex items-center justify-center text-[10px] font-bold transition-colors"
+              >
+                ?
+              </button>
+              {showTip && (
+                <div className="absolute left-6 top-0 z-50 w-64 p-3 bg-surface border border-white/10 rounded-lg shadow-xl text-xs text-foreground/70 leading-relaxed">
+                  {tooltip}
+                  <button onClick={() => setShowTip(false)} className="block text-accent text-[10px] mt-1">Close</button>
+                </div>
+              )}
+            </div>
+          )}
+          <span className="text-xs text-muted ml-1">{subtitle}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted/40 font-mono">{chapter}</span>
@@ -553,6 +578,7 @@ function LeverDiagnosis({ lever }: { lever: Lever }) {
 function FulcrumEditor({
   label,
   subtitle,
+  tooltip,
   color,
   chapter,
   state,
@@ -560,17 +586,35 @@ function FulcrumEditor({
 }: {
   label: string;
   subtitle: string;
+  tooltip?: string;
   color: string;
   chapter: string;
   state: FulcrumState;
   onChange: (field: keyof FulcrumState, value: string) => void;
 }) {
+  const [showTip, setShowTip] = useState(false);
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <div>
+        <div className="flex items-center gap-1.5">
           <h4 className={`font-medium text-${color}`}>{label}</h4>
-          <p className="text-xs text-muted">{subtitle}</p>
+          {tooltip && (
+            <div className="relative">
+              <button
+                onClick={() => setShowTip(!showTip)}
+                className="w-4 h-4 rounded-full bg-white/10 text-muted hover:text-foreground hover:bg-white/20 flex items-center justify-center text-[10px] font-bold transition-colors"
+              >
+                ?
+              </button>
+              {showTip && (
+                <div className="absolute left-6 top-0 z-50 w-64 p-3 bg-surface border border-white/10 rounded-lg shadow-xl text-xs text-foreground/70 leading-relaxed">
+                  {tooltip}
+                  <button onClick={() => setShowTip(false)} className="block text-accent text-[10px] mt-1">Close</button>
+                </div>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-muted ml-1">{subtitle}</p>
         </div>
         <span className="text-[10px] text-muted/40 font-mono">{chapter}</span>
       </div>
