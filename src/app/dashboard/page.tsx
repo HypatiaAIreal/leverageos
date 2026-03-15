@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [levers, setLevers] = useState<Lever[]>([]);
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'category'>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const { showOnboarding, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
@@ -44,6 +45,13 @@ export default function DashboardPage() {
   const handleLoadCarles = () => {
     const portfolio = loadCarlesPortfolio();
     setLevers(portfolio);
+  };
+
+  const handleClearAll = () => {
+    localStorage.removeItem('leverageos_levers');
+    localStorage.removeItem('leverageos_milestones');
+    setLevers([]);
+    setShowClearConfirm(false);
   };
 
   const sortedLevers = [...levers].sort((a, b) => {
@@ -100,16 +108,26 @@ export default function DashboardPage() {
           <h1 className="font-heading text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted text-sm mt-1">Your leverage system at a glance</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {levers.length > 0 && (
-            <motion.button
-              onClick={() => generateLeverageReport(levers)}
-              className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Print Report
-            </motion.button>
+            <>
+              <motion.button
+                onClick={() => generateLeverageReport(levers)}
+                className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Print Report
+              </motion.button>
+              <motion.button
+                onClick={() => setShowClearConfirm(true)}
+                className="px-3 py-1.5 bg-at-risk/5 text-at-risk/70 border border-at-risk/20 rounded-lg text-xs font-medium hover:bg-at-risk/10 hover:text-at-risk transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Clear All Data
+              </motion.button>
+            </>
           )}
           <DataPortability onImport={refreshLevers} />
           {levers.length === 0 && (
@@ -120,7 +138,7 @@ export default function DashboardPage() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                Load Carles&apos;s Portfolio
+                My Portfolio
               </motion.button>
               <motion.button
                 onClick={handleLoadSample}
@@ -128,11 +146,51 @@ export default function DashboardPage() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                Load Sample Data
+                Demo Data
               </motion.button>
             </>
           )}
         </div>
+
+        {/* Clear All Confirmation Dialog */}
+        <AnimatePresence>
+          {showClearConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              onClick={() => setShowClearConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-surface border border-white/10 rounded-xl p-6 max-w-sm w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="font-heading text-lg font-semibold text-foreground mb-2">Clear All Data?</h3>
+                <p className="text-sm text-muted mb-6">Are you sure? This will delete all levers and reviews. This action cannot be undone.</p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowClearConfirm(false)}
+                    className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    onClick={handleClearAll}
+                    className="px-4 py-2 bg-at-risk text-white rounded-lg text-sm font-medium hover:bg-at-risk/80 transition-colors"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Delete Everything
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Fulcrum Health Panel */}
@@ -141,6 +199,17 @@ export default function DashboardPage() {
         <FulcrumHealthBar label="Epistemic" subtitle="Can you prove it?" color="bg-epistemic" health={epistemicHealth} chapter="Ch. 8" />
         <FulcrumHealthBar label="Relational" subtitle="Do they trust it?" color="bg-relational" health={relationalHealth} chapter="Ch. 9" />
       </div>
+
+      {/* Auto-generated Interpretation Panel */}
+      {levers.length > 0 && (
+        <SystemInterpretation
+          materialScore={materialHealth.score}
+          epistemicScore={epistemicHealth.score}
+          relationalScore={relationalHealth.score}
+          levers={levers}
+          alertCount={alerts.length}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lever Portfolio - takes 2 cols */}
@@ -313,6 +382,101 @@ function StatusBadge({ label, count, color }: { label: string; count: number; co
       <span className={`font-mono font-bold ${color}`}>{count}</span>
       <span className="text-muted">{label}</span>
     </div>
+  );
+}
+
+function SystemInterpretation({
+  materialScore,
+  epistemicScore,
+  relationalScore,
+  levers,
+  alertCount,
+}: {
+  materialScore: number;
+  epistemicScore: number;
+  relationalScore: number;
+  levers: Lever[];
+  alertCount: number;
+}) {
+  const scores = [
+    { name: 'Material', score: materialScore, color: 'text-material' },
+    { name: 'Epistemic', score: epistemicScore, color: 'text-epistemic' },
+    { name: 'Relational', score: relationalScore, color: 'text-relational' },
+  ];
+
+  const strongest = [...scores].sort((a, b) => b.score - a.score)[0];
+  const weakest = [...scores].sort((a, b) => a.score - b.score)[0];
+  const avgScore = Math.round((materialScore + epistemicScore + relationalScore) / 3);
+
+  const insights: { text: string; level: 'green' | 'amber' | 'red' }[] = [];
+
+  // Strongest / weakest
+  insights.push({
+    text: `Your strongest fulcrum is ${strongest.name} (${strongest.score}%). Your weakest is ${weakest.name} (${weakest.score}%).`,
+    level: weakest.score >= 60 ? 'green' : weakest.score >= 30 ? 'amber' : 'red',
+  });
+
+  // Specific recommendations
+  if (relationalScore < 30 && materialScore > 60) {
+    insights.push({
+      text: 'Focus on building verified relationships before adding new levers. Your Material base is solid but Relational trust is missing.',
+      level: 'amber',
+    });
+  }
+  if (epistemicScore < 40 && materialScore > 50) {
+    insights.push({
+      text: 'Epistemic credibility needs evidence. Gather proof: testimonials, data, third-party validation.',
+      level: 'amber',
+    });
+  }
+  if (materialScore < 30) {
+    insights.push({
+      text: 'Material fulcrum is critically low. Pause expansion and secure your financial/survival foundation first.',
+      level: 'red',
+    });
+  }
+  if (avgScore >= 70 && alertCount === 0) {
+    insights.push({
+      text: 'System is healthy. All fulcrums above average with no sequence violations.',
+      level: 'green',
+    });
+  }
+  if (alertCount > 0) {
+    insights.push({
+      text: `${alertCount} alert(s) detected. Review the Sequence Analyzer to fix violations before they compound.`,
+      level: 'red',
+    });
+  }
+
+  // Zero leverage warning
+  const zeroLevers = levers.filter((l) => l.effectiveLeverage === 0);
+  if (zeroLevers.length > 0) {
+    insights.push({
+      text: `${zeroLevers.length} lever(s) have zero effective leverage. A collapsed property nullifies everything.`,
+      level: 'red',
+    });
+  }
+
+  const levelColors = { green: 'border-verified/20 bg-verified/5', amber: 'border-assumed/20 bg-assumed/5', red: 'border-at-risk/20 bg-at-risk/5' };
+  const levelTextColors = { green: 'text-verified', amber: 'text-assumed', red: 'text-at-risk' };
+  const levelDots = { green: 'bg-verified', amber: 'bg-assumed', red: 'bg-at-risk' };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface rounded-xl border border-white/5 p-5"
+    >
+      <h2 className="font-heading text-sm font-semibold text-muted mb-3 uppercase tracking-wider">System Interpretation</h2>
+      <div className="space-y-2">
+        {insights.map((insight, i) => (
+          <div key={i} className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${levelColors[insight.level]}`}>
+            <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${levelDots[insight.level]}`} />
+            <p className={`text-xs ${levelTextColors[insight.level]}`}>{insight.text}</p>
+          </div>
+        ))}
+      </div>
+    </motion.div>
   );
 }
 

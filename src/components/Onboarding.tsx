@@ -8,26 +8,32 @@ const ONBOARDING_KEY = 'leverageos_onboarded';
 const steps = [
   {
     title: 'Welcome to LeverageOS',
-    subtitle: 'Your Life as a System of Conscious Leverage',
+    subtitle: 'Your book made interactive',
     body: 'Companion app to The Invisible Fulcrum (Garcia Bach & Hypatia, 2026). Every action you take is a lever. This system helps you see, calibrate, and strengthen them.',
     color: '#c4a35a',
   },
   {
-    title: 'The Formula',
-    subtitle: 'Effective Leverage = R × L × Q',
-    body: 'Rigidity — how shockproof is it?\nLength — how far does it reach?\nQuality — how excellent is the material?\n\nMultiplicative: zero in any = zero total.',
+    title: 'Create Your First Lever',
+    subtitle: 'Start in the Workshop',
+    body: 'A lever is any asset, project, or capability you\'re building.\n\nGo to the Lever Workshop to define it — give it a name, a category, and a description of the outcome it creates.',
     color: '#c4a35a',
   },
   {
-    title: 'The Three Fulcrums',
-    subtitle: 'Material → Epistemic → Relational',
-    body: 'Material: Can you survive while this operates?\nEpistemic: Can you prove its credibility?\nRelational: Does the audience trust it?\n\nThis sequence is non-negotiable.',
+    title: 'Rate Its Properties',
+    subtitle: 'Rigidity × Length × Quality',
+    body: 'Rigidity — how shockproof is it? (1-10)\nLength — how far does it reach? (1-10)\nQuality — how excellent is the material? (1-10)\n\nMultiplicative: zero in any = zero total. Be honest.',
+    color: '#8b5cf6',
+  },
+  {
+    title: 'Assess Your Fulcrums',
+    subtitle: 'With honest evidence',
+    body: 'Material: Can you survive while this operates?\nEpistemic: Can you prove its credibility?\nRelational: Does the audience trust it?\n\nEach requires EVIDENCE, not self-assessment. The sequence is non-negotiable: Material → Epistemic → Relational.',
     color: '#1D9E75',
   },
   {
-    title: 'Your Toolkit',
-    subtitle: 'Five views, one system',
-    body: 'Dashboard — system health at a glance\nWorkshop — create and calibrate levers\nFulcrum Map — visual mapping in fulcrum space\nSequence Analyzer — violation detection\nEvolution Tracker — growth over time',
+    title: 'Watch the System Reveal Itself',
+    subtitle: 'Your Dashboard awaits',
+    body: 'The Dashboard shows your fulcrum health, alerts, and leverage scores. The Sequence Analyzer flags violations. The Evolution Tracker charts your growth.\n\nYour leverage system is now visible. Use it.',
     color: '#378ADD',
   },
 ];
@@ -111,7 +117,7 @@ export function OnboardingModal({ onComplete }: { onComplete: () => void }) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isLast ? 'Get Started' : 'Next'}
+              {isLast ? "Got it, let's start" : 'Next'}
             </motion.button>
           </div>
         </div>
