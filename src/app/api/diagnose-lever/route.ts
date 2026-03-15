@@ -8,7 +8,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
   }
 
-  const { lever } = await req.json();
+  const { lever, lang } = await req.json();
+
+  const langInstruction = lang === 'es' ? '\n\nIMPORTANT: Respond entirely in Spanish.' : '';
 
   const systemPrompt = `You are the strategic advisor inside LeverageOS, the companion app to "The Invisible Fulcrum" (Garcia Bach & Hypatia, 2026).
 
@@ -26,7 +28,7 @@ Properties:
 - Length (1-10): How far it reaches / time horizon
 - Quality (1-10): How well-built the underlying asset
 
-You are performing a deep diagnosis of a single lever. Be specific, strategic, and actionable.`;
+You are performing a deep diagnosis of a single lever. Be specific, strategic, and actionable.${langInstruction}`;
 
   const userPrompt = `Diagnose this lever in depth:
 

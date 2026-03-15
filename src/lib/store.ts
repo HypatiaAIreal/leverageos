@@ -1,8 +1,11 @@
 'use client';
 
-import { Lever } from './types';
+import { Lever, SavedReview, ChatMessage } from './types';
 
 const STORAGE_KEY = 'leverageos_levers';
+const REVIEWS_KEY = 'leverageos_reviews';
+const CHAT_KEY = 'leverageos_chat';
+const LANG_KEY = 'leverageos_lang';
 
 export function getLevers(): Lever[] {
   if (typeof window === 'undefined') return [];
@@ -247,4 +250,42 @@ export function loadCarlesPortfolio(): Lever[] {
 
   saveLevers(levers);
   return levers;
+}
+
+// Review History
+export function getReviews(): SavedReview[] {
+  if (typeof window === 'undefined') return [];
+  const data = localStorage.getItem(REVIEWS_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveReview(review: SavedReview): void {
+  const reviews = getReviews();
+  reviews.unshift(review);
+  localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
+}
+
+// Chat History
+export function getChatMessages(): ChatMessage[] {
+  if (typeof window === 'undefined') return [];
+  const data = localStorage.getItem(CHAT_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveChatMessages(messages: ChatMessage[]): void {
+  localStorage.setItem(CHAT_KEY, JSON.stringify(messages));
+}
+
+export function clearChatMessages(): void {
+  localStorage.removeItem(CHAT_KEY);
+}
+
+// Language
+export function getLanguage(): 'en' | 'es' {
+  if (typeof window === 'undefined') return 'en';
+  return (localStorage.getItem(LANG_KEY) as 'en' | 'es') || 'en';
+}
+
+export function setLanguage(lang: 'en' | 'es'): void {
+  localStorage.setItem(LANG_KEY, lang);
 }

@@ -49,4 +49,30 @@ export interface WeeklyReview {
   celebration: string;
 }
 
-export type ViewName = 'dashboard' | 'workshop' | 'fulcrum-map' | 'sequence' | 'evolution';
+export interface SavedReview {
+  id: string;
+  date: string;
+  quickWin: string;
+  bottleneck: string;
+  sequenceAlerts: string[];
+  fulcrumTraps: string[];
+  celebration: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  actions?: LeverAction[];
+}
+
+export interface LeverAction {
+  leverId: string;
+  leverName: string;
+  field: string;
+  value: string | number;
+  applied?: boolean;
+}
+
+export type ViewName = 'dashboard' | 'workshop' | 'fulcrum-map' | 'sequence' | 'evolution' | 'chat';

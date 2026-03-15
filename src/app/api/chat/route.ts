@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
+interface ChatMsg {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
   }
 
-  const { levers, lang } = await req.json();
+  const { messages, levers, lang } = await req.json();
 
   const langInstruction = lang === 'es' ? '\n\nIMPORTANT: Respond entirely in Spanish.' : '';
 
@@ -16,29 +21,31 @@ export async function POST(req: NextRequest) {
 
 Core formula: Effective Leverage = Rigidity × Length × Quality of Material (multiplicative: zero in any = zero total).
 
-The Three Fulcrums (must be built in this order):
+The Three Fulcrums (must be built in order):
 1. Material (green): Can you survive while this operates?
 2. Epistemic (blue): Can you prove its credibility?
 3. Relational (orange): Does the audience trust it?
 
 Fulcrum statuses: verified, assumed, at_risk, absent.
+Properties: Rigidity (1-10), Length (1-10), Quality (1-10).
 
-You are performing a weekly review of the user's leverage system. Be direct, strategic, and reference the book's concepts. Speak like a sharp advisor, not a motivational poster.${langInstruction}`;
-
-  const userPrompt = `Here is the user's current lever portfolio:
-
+You have access to the user's complete lever portfolio:
 ${JSON.stringify(levers, null, 2)}
 
-Analyze this system and provide a JSON response with exactly these fields:
-{
-  "quickWin": "The single most impactful action they could take this week (1-2 sentences)",
-  "bottleneck": "The biggest constraint limiting their overall leverage (1-2 sentences)",
-  "sequenceAlerts": ["Array of any sequence violations or order concerns"],
-  "fulcrumTraps": ["Array of any fulcrum traps - e.g., building on assumptions, relational without epistemic backing"],
-  "celebration": "One genuine thing worth celebrating in their system (1 sentence)"
-}
+You can suggest changes to levers. When you recommend changing a lever's property or fulcrum status, format it as a line starting with ACTION: followed by a JSON object like:
+ACTION: {"leverId": "abc123", "leverName": "My Lever", "field": "properties.r", "value": 7}
+ACTION: {"leverId": "abc123", "leverName": "My Lever", "field": "fulcrums.material.status", "value": "verified"}
 
-Return ONLY valid JSON, no markdown fences or other text.`;
+Valid fields: properties.r, properties.l, properties.q, fulcrums.material.status, fulcrums.epistemic.status, fulcrums.relational.status
+
+The user can then click 'Apply' to update their data.
+
+Be direct, strategic, and reference the book's concepts. Speak like a sharp advisor, not a motivational poster.${langInstruction}`;
+
+  const apiMessages: ChatMsg[] = messages.map((m: ChatMsg) => ({
+    role: m.role,
+    content: m.content,
+  }));
 
   try {
     const response = await fetch(ANTHROPIC_API_URL, {
@@ -50,9 +57,9 @@ Return ONLY valid JSON, no markdown fences or other text.`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: apiMessages,
       }),
     });
 
@@ -64,11 +71,9 @@ Return ONLY valid JSON, no markdown fences or other text.`;
     const data = await response.json();
     const text = data.content[0].text;
 
-    // Parse the JSON from Claude's response
-    const parsed = JSON.parse(text);
-    return NextResponse.json(parsed);
+    return NextResponse.json({ content: text });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: `Failed to get review: ${message}` }, { status: 500 });
+    return NextResponse.json({ error: `Failed to chat: ${message}` }, { status: 500 });
   }
 }

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lever, FulcrumStatus } from '@/lib/types';
-import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations } from '@/lib/store';
+import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations, saveReview, getReviews, generateId, getLanguage } from '@/lib/store';
+import { SavedReview } from '@/lib/types';
 import Link from 'next/link';
 import { useOnboarding, OnboardingModal } from '@/components/Onboarding';
 import DataPortability from '@/components/DataPortability';
@@ -50,6 +51,8 @@ export default function DashboardPage() {
   const handleClearAll = () => {
     localStorage.removeItem('leverageos_levers');
     localStorage.removeItem('leverageos_milestones');
+    localStorage.removeItem('leverageos_reviews');
+    localStorage.removeItem('leverageos_chat');
     setLevers([]);
     setShowClearConfirm(false);
   };
@@ -317,8 +320,129 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Review History */}
+      <ReviewHistoryPanel />
     </div>
     </PageTransition>
+  );
+}
+
+function ReviewHistoryPanel() {
+  const [reviews, setReviews] = useState<SavedReview[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReviews(getReviews());
+  }, []);
+
+  if (reviews.length === 0) return null;
+
+  // Detect trend: find bottleneck mentions across last reviews
+  const recentReviews = reviews.slice(0, 5);
+  const bottleneckWords = recentReviews.map((r) => r.bottleneck.toLowerCase());
+  const trendMap: Record<string, number> = {};
+  ['material', 'epistemic', 'relational'].forEach((fulcrum) => {
+    const count = bottleneckWords.filter((b) => b.includes(fulcrum)).length;
+    if (count >= 2) trendMap[fulcrum] = count;
+  });
+
+  return (
+    <div className="bg-surface rounded-xl border border-white/5 p-6">
+      <h2 className="font-heading text-xl font-semibold mb-4 flex items-center gap-2">
+        Review History
+        <span className="text-xs text-muted font-mono">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</span>
+      </h2>
+
+      {/* Trend indicators */}
+      {Object.keys(trendMap).length > 0 && (
+        <div className="mb-4 space-y-1">
+          {Object.entries(trendMap).map(([fulcrum, count]) => (
+            <div key={fulcrum} className="flex items-center gap-2 text-xs p-2 bg-assumed/5 border border-assumed/20 rounded-lg">
+              <div className="w-2 h-2 rounded-full bg-assumed" />
+              <span className="text-assumed">
+                {fulcrum.charAt(0).toUpperCase() + fulcrum.slice(1)} fulcrum mentioned as bottleneck {count}/{recentReviews.length} recent reviews
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-3 max-h-96 overflow-y-auto">
+        {reviews.map((review) => {
+          const isExpanded = expandedId === review.id;
+          const date = new Date(review.date);
+          return (
+            <motion.div
+              key={review.id}
+              className="border border-white/5 rounded-lg overflow-hidden"
+            >
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : review.id)}
+                className="w-full text-left p-4 hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-muted">
+                      {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    <span className="text-xs text-muted/50">
+                      {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <svg className={`w-4 h-4 text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </div>
+                <p className="text-xs text-foreground/70 mt-1 line-clamp-1">{review.quickWin}</p>
+              </button>
+
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-t border-white/5"
+                  >
+                    <div className="p-4 space-y-3 text-xs">
+                      <div>
+                        <p className="text-muted font-mono uppercase tracking-wider text-[10px] mb-1">Quick Win</p>
+                        <p className="text-foreground/90">{review.quickWin}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted font-mono uppercase tracking-wider text-[10px] mb-1">Bottleneck</p>
+                        <p className="text-foreground/90">{review.bottleneck}</p>
+                      </div>
+                      {review.sequenceAlerts.length > 0 && (
+                        <div>
+                          <p className="text-at-risk font-mono uppercase tracking-wider text-[10px] mb-1">Sequence Alerts</p>
+                          {review.sequenceAlerts.map((a, i) => (
+                            <p key={i} className="text-foreground/70 ml-2">- {a}</p>
+                          ))}
+                        </div>
+                      )}
+                      {review.fulcrumTraps.length > 0 && (
+                        <div>
+                          <p className="text-assumed font-mono uppercase tracking-wider text-[10px] mb-1">Fulcrum Traps</p>
+                          {review.fulcrumTraps.map((t, i) => (
+                            <p key={i} className="text-foreground/70 ml-2">- {t}</p>
+                          ))}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-verified font-mono uppercase tracking-wider text-[10px] mb-1">Celebration</p>
+                        <p className="text-foreground/90">{review.celebration}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -498,10 +622,11 @@ function WeeklyReviewPanel({ levers }: { levers: Lever[] }) {
     setLoading(true);
     setError(null);
     try {
+      const lang = getLanguage();
       const res = await fetch('/api/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ levers }),
+        body: JSON.stringify({ levers, lang }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -509,6 +634,13 @@ function WeeklyReviewPanel({ levers }: { levers: Lever[] }) {
       }
       const data = await res.json();
       setReview(data);
+      // Save to review history
+      const saved: SavedReview = {
+        id: generateId(),
+        date: new Date().toISOString(),
+        ...data,
+      };
+      saveReview(saved);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

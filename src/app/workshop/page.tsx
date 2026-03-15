@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lever, FulcrumStatus, FulcrumState } from '@/lib/types';
-import { getLevers, saveLever, deleteLever, generateId, detectSequenceViolations } from '@/lib/store';
+import { getLevers, saveLever, deleteLever, generateId, detectSequenceViolations, getLanguage } from '@/lib/store';
 
 const categories = ['Career', 'Business', 'Brand', 'Education', 'Community', 'Personal', 'Financial', 'Creative'];
 
@@ -459,10 +459,11 @@ function LeverDiagnosis({ lever }: { lever: Lever }) {
     setLoading(true);
     setError(null);
     try {
+      const lang = getLanguage();
       const res = await fetch('/api/diagnose-lever', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lever }),
+        body: JSON.stringify({ lever, lang }),
       });
       if (!res.ok) {
         const data = await res.json();
