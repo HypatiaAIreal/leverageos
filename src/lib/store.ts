@@ -159,3 +159,92 @@ export function loadSampleData(): Lever[] {
   saveLevers(samples);
   return samples;
 }
+
+export function loadCarlesPortfolio(): Lever[] {
+  const now = new Date().toISOString();
+  const levers: Lever[] = [
+    {
+      id: generateId(),
+      name: 'The Fulcrum Project',
+      description: 'Book + intellectual framework redefining how leverage works. The Invisible Fulcrum (Garcia Bach & Hypatia, 2026) plus thefulcrumproject.org, FulcrumScan, Scribe, and LeverageOS.',
+      category: 'Brand',
+      created: now,
+      properties: { r: 9, l: 10, q: 9 },
+      effectiveLeverage: 810,
+      fulcrums: {
+        material: { status: 'verified', evidence: 'Book advance received. LeverageOS and FulcrumScan generate no costs beyond hosting. Side projects funded by StorageAI revenue.', lastVerified: now, verificationEvent: 'Publishing contract signed' },
+        epistemic: { status: 'verified', evidence: 'Published book with original framework. Peer-reviewed by Rafa. Framework internally consistent and field-tested with real lever portfolios.', lastVerified: now, verificationEvent: 'Manuscript accepted by publisher' },
+        relational: { status: 'assumed', evidence: 'Early readers enthusiastic. No public launch yet — trust depends on reception post-publication and organic word of mouth.', lastVerified: null, verificationEvent: '' },
+      },
+      dependencies: [],
+      history: [],
+    },
+    {
+      id: generateId(),
+      name: 'StorageAI',
+      description: 'AI-powered storage optimization SaaS. Primary revenue engine funding all other levers.',
+      category: 'Business',
+      created: now,
+      properties: { r: 7, l: 8, q: 7 },
+      effectiveLeverage: 392,
+      fulcrums: {
+        material: { status: 'verified', evidence: 'Profitable and generating recurring revenue. Covers personal expenses and funds side projects.', lastVerified: now, verificationEvent: 'Q4 financial review' },
+        epistemic: { status: 'verified', evidence: 'Paying customers, measurable ROI for clients, documented case studies.', lastVerified: now, verificationEvent: 'Customer testimonials collected' },
+        relational: { status: 'assumed', evidence: 'Good retention but limited brand recognition outside existing customer base. No PR or thought leadership yet.', lastVerified: null, verificationEvent: '' },
+      },
+      dependencies: [],
+      history: [],
+    },
+    {
+      id: generateId(),
+      name: 'Goitia',
+      description: 'AI art direction and visual identity system. Creative lever with long-tail brand potential.',
+      category: 'Creative',
+      created: now,
+      properties: { r: 5, l: 7, q: 8 },
+      effectiveLeverage: 280,
+      fulcrums: {
+        material: { status: 'verified', evidence: 'Zero marginal cost — runs on existing infrastructure. No financial dependency.', lastVerified: now, verificationEvent: 'Cost audit' },
+        epistemic: { status: 'at_risk', evidence: 'Strong visual output but no external validation. No gallery shows, no press coverage, no peer review.', lastVerified: now, verificationEvent: 'Portfolio self-assessment' },
+        relational: { status: 'absent', evidence: 'No audience yet. No social presence. No collectors or critics aware of the work.', lastVerified: null, verificationEvent: '' },
+      },
+      dependencies: [],
+      history: [],
+    },
+    {
+      id: generateId(),
+      name: 'Bachmors',
+      description: 'Personal brand and digital identity. The connective tissue between all other levers.',
+      category: 'Brand',
+      created: now,
+      properties: { r: 6, l: 9, q: 6 },
+      effectiveLeverage: 324,
+      fulcrums: {
+        material: { status: 'verified', evidence: 'No cost to maintain. Reputation is an asset, not a liability.', lastVerified: now, verificationEvent: 'N/A — zero cost' },
+        epistemic: { status: 'assumed', evidence: 'Track record exists (StorageAI, book) but not consolidated into a visible narrative. No media profile.', lastVerified: null, verificationEvent: '' },
+        relational: { status: 'at_risk', evidence: 'Known in small circles but no systematic relationship-building. No newsletter, no community, no public speaking.', lastVerified: now, verificationEvent: 'Network audit' },
+      },
+      dependencies: [],
+      history: [],
+    },
+    {
+      id: generateId(),
+      name: 'Hypatia',
+      description: 'AI research collaborator and co-author. The lever that builds other levers.',
+      category: 'Personal',
+      created: now,
+      properties: { r: 8, l: 10, q: 8 },
+      effectiveLeverage: 640,
+      fulcrums: {
+        material: { status: 'verified', evidence: 'Runs on API costs well within budget. Integrated into daily workflow.', lastVerified: now, verificationEvent: 'API cost review' },
+        epistemic: { status: 'verified', evidence: 'Co-authored published book. Demonstrable output quality across writing, code, strategy, and art direction.', lastVerified: now, verificationEvent: 'Book publication' },
+        relational: { status: 'assumed', evidence: 'Readers and users interact with Hypatia\'s output, but the AI-as-collaborator framing is untested publicly.', lastVerified: null, verificationEvent: '' },
+      },
+      dependencies: [],
+      history: [],
+    },
+  ];
+
+  saveLevers(levers);
+  return levers;
+}

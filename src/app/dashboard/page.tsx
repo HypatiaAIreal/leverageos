@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lever, FulcrumStatus } from '@/lib/types';
-import { getLevers, loadSampleData, detectSequenceViolations } from '@/lib/store';
+import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations } from '@/lib/store';
 import Link from 'next/link';
 import { useOnboarding, OnboardingModal } from '@/components/Onboarding';
 import DataPortability from '@/components/DataPortability';
 import PageTransition from '@/components/PageTransition';
+import { generateLeverageReport } from '@/components/LeverageReport';
 
 const statusColors: Record<FulcrumStatus, string> = {
   verified: 'bg-verified',
@@ -38,6 +39,11 @@ export default function DashboardPage() {
   const handleLoadSample = () => {
     const samples = loadSampleData();
     setLevers(samples);
+  };
+
+  const handleLoadCarles = () => {
+    const portfolio = loadCarlesPortfolio();
+    setLevers(portfolio);
   };
 
   const sortedLevers = [...levers].sort((a, b) => {
@@ -95,16 +101,36 @@ export default function DashboardPage() {
           <p className="text-muted text-sm mt-1">Your leverage system at a glance</p>
         </div>
         <div className="flex items-center gap-2">
-          <DataPortability onImport={refreshLevers} />
-          {levers.length === 0 && (
+          {levers.length > 0 && (
             <motion.button
-              onClick={handleLoadSample}
-              className="px-4 py-2 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors"
+              onClick={() => generateLeverageReport(levers)}
+              className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              Load Sample Data
+              Print Report
             </motion.button>
+          )}
+          <DataPortability onImport={refreshLevers} />
+          {levers.length === 0 && (
+            <>
+              <motion.button
+                onClick={handleLoadCarles}
+                className="px-4 py-2 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Load Carles&apos;s Portfolio
+              </motion.button>
+              <motion.button
+                onClick={handleLoadSample}
+                className="px-4 py-2 bg-white/5 text-muted border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Load Sample Data
+              </motion.button>
+            </>
           )}
         </div>
       </div>
