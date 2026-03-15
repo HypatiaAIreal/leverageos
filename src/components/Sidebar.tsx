@@ -12,6 +12,7 @@ const navItems = [
   { href: '/fulcrum-map', label: 'Fulcrum Map', icon: MapIcon, chapter: 'Ch. 7-9' },
   { href: '/sequence', label: 'Sequence Analyzer', icon: SequenceIcon, chapter: 'Ch. 10' },
   { href: '/evolution', label: 'Evolution Tracker', icon: EvolutionIcon, chapter: 'Growth' },
+  { href: '/tasks', label: 'Tasks & Projects', icon: TasksIcon, chapter: 'Execution' },
   { href: '/chat', label: 'Chat', icon: ChatIcon, chapter: 'Advisor' },
   { href: '/help', label: 'Help & Reference', icon: HelpIcon, chapter: 'Guide' },
 ];
@@ -173,6 +174,14 @@ function EvolutionIcon({ active }: { active: boolean }) {
   return (
     <svg className={`w-4 h-4 ${active ? 'text-accent' : 'text-muted'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+    </svg>
+  );
+}
+
+function TasksIcon({ active }: { active: boolean }) {
+  return (
+    <svg className={`w-4 h-4 ${active ? 'text-accent' : 'text-muted'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   );
 }

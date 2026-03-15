@@ -57,6 +57,10 @@ export interface SavedReview {
   sequenceAlerts: string[];
   fulcrumTraps: string[];
   celebration: string;
+  // Fulcrum scores at time of review (for evolution tracking)
+  materialScore?: number;
+  epistemicScore?: number;
+  relationalScore?: number;
 }
 
 export interface ChatMessage {
@@ -73,6 +77,33 @@ export interface LeverAction {
   field: string;
   value: string | number;
   applied?: boolean;
+  type?: 'update_lever' | 'create_task';
+  // For create_task actions
+  taskLever?: string;
+  taskName?: string;
+  taskDue?: string;
 }
 
-export type ViewName = 'dashboard' | 'workshop' | 'fulcrum-map' | 'sequence' | 'evolution' | 'chat';
+export type ProjectStatus = 'not_started' | 'in_progress' | 'done';
+
+export interface Subtask {
+  id: string;
+  name: string;
+  done: boolean;
+  notes: string;
+  dueDate: string | null;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  leverId: string;
+  leverName: string;
+  dueDate: string | null;
+  status: ProjectStatus;
+  subtasks: Subtask[];
+  created: string;
+}
+
+export type ViewName = 'dashboard' | 'workshop' | 'fulcrum-map' | 'sequence' | 'evolution' | 'chat' | 'tasks';

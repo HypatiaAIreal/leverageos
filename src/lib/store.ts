@@ -1,11 +1,12 @@
 'use client';
 
-import { Lever, SavedReview, ChatMessage } from './types';
+import { Lever, SavedReview, ChatMessage, Project } from './types';
 
 const STORAGE_KEY = 'leverageos_levers';
 const REVIEWS_KEY = 'leverageos_reviews';
 const CHAT_KEY = 'leverageos_chat';
 const LANG_KEY = 'leverageos_lang';
+const PROJECTS_KEY = 'leverageos_projects';
 
 export function getLevers(): Lever[] {
   if (typeof window === 'undefined') return [];
@@ -288,4 +289,31 @@ export function getLanguage(): 'en' | 'es' {
 
 export function setLanguage(lang: 'en' | 'es'): void {
   localStorage.setItem(LANG_KEY, lang);
+}
+
+// Projects & Tasks
+export function getProjects(): Project[] {
+  if (typeof window === 'undefined') return [];
+  const data = localStorage.getItem(PROJECTS_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveProjects(projects: Project[]): void {
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+export function saveProject(project: Project): void {
+  const projects = getProjects();
+  const idx = projects.findIndex((p) => p.id === project.id);
+  if (idx >= 0) {
+    projects[idx] = project;
+  } else {
+    projects.push(project);
+  }
+  saveProjects(projects);
+}
+
+export function deleteProject(id: string): void {
+  const projects = getProjects().filter((p) => p.id !== id);
+  saveProjects(projects);
 }

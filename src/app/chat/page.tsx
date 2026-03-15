@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChatMessage, LeverAction, Lever } from '@/lib/types';
-import { getLevers, getChatMessages, saveChatMessages, clearChatMessages, generateId, getLanguage, saveLever } from '@/lib/store';
+import { ChatMessage, LeverAction, Lever, Project } from '@/lib/types';
+import { getLevers, getChatMessages, saveChatMessages, clearChatMessages, generateId, getLanguage, saveLever, getProjects, getReviews, saveProject } from '@/lib/store';
 import PageTransition from '@/components/PageTransition';
 
 function parseActions(text: string, levers: Lever[]): LeverAction[] {
@@ -14,13 +14,26 @@ function parseActions(text: string, levers: Lever[]): LeverAction[] {
     if (match) {
       try {
         const parsed = JSON.parse(match[1]);
-        if (parsed.leverId && parsed.field && parsed.value !== undefined) {
+        if (parsed.type === 'create_task' && parsed.leverId && parsed.taskName) {
+          const lever = levers.find((l) => l.id === parsed.leverId);
+          actions.push({
+            leverId: parsed.leverId,
+            leverName: parsed.leverName || lever?.name || 'Unknown',
+            field: '',
+            value: '',
+            type: 'create_task',
+            taskLever: parsed.leverId,
+            taskName: parsed.taskName,
+            taskDue: parsed.taskDue || null,
+          });
+        } else if (parsed.leverId && parsed.field && parsed.value !== undefined) {
           const lever = levers.find((l) => l.id === parsed.leverId);
           actions.push({
             leverId: parsed.leverId,
             leverName: parsed.leverName || lever?.name || 'Unknown',
             field: parsed.field,
             value: parsed.value,
+            type: 'update_lever',
           });
         }
       } catch {
@@ -32,6 +45,24 @@ function parseActions(text: string, levers: Lever[]): LeverAction[] {
 }
 
 function applyAction(action: LeverAction, levers: Lever[]): boolean {
+  if (action.type === 'create_task') {
+    const lever = levers.find((l) => l.id === action.leverId);
+    if (!lever) return false;
+    const project: Project = {
+      id: generateId(),
+      name: action.taskName || 'New Task',
+      description: '',
+      leverId: action.leverId,
+      leverName: lever.name,
+      dueDate: action.taskDue || null,
+      status: 'not_started',
+      subtasks: [],
+      created: new Date().toISOString(),
+    };
+    saveProject(project);
+    return true;
+  }
+
   const lever = levers.find((l) => l.id === action.leverId);
   if (!lever) return false;
 
@@ -101,10 +132,13 @@ export default function ChatPage() {
       const lang = getLanguage();
       const apiMessages = newMessages.map((m) => ({ role: m.role, content: m.content }));
 
+      const currentProjects = getProjects();
+      const recentReviews = getReviews().slice(0, 3);
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, levers: currentLevers, lang }),
+        body: JSON.stringify({ messages: apiMessages, levers: currentLevers, lang, projects: currentProjects, recentReviews }),
       });
 
       if (!res.ok) {
@@ -182,7 +216,7 @@ export default function ChatPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="font-heading text-3xl font-bold text-foreground">Chat</h1>
-            <p className="text-muted text-sm mt-1">Strategic advisor with portfolio context</p>
+            <p className="text-muted text-sm mt-1">Hypatia — strategic advisor with full system context</p>
           </div>
           {messages.length > 0 && (
             <button
@@ -204,15 +238,15 @@ export default function ChatPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
                   </svg>
                 </div>
-                <h2 className="font-heading text-lg font-semibold text-foreground mb-2">Strategic Advisor</h2>
+                <h2 className="font-heading text-lg font-semibold text-foreground mb-2">Hypatia — Strategic Advisor</h2>
                 <p className="text-muted text-sm mb-4">
-                  I have full context on your lever portfolio ({levers.length} lever{levers.length !== 1 ? 's' : ''}).
+                  I have full context on your lever portfolio ({levers.length} lever{levers.length !== 1 ? 's' : ''}), tasks, and review history.
                   Ask me anything about your leverage system.
                 </p>
                 <div className="space-y-2 text-xs text-muted/70">
                   <p>&quot;Which lever should I focus on this week?&quot;</p>
-                  <p>&quot;My SaaS just lost a customer. How does that affect my system?&quot;</p>
-                  <p>&quot;Should I lower the Rigidity on my side project?&quot;</p>
+                  <p>&quot;Create a task for my Fulcrum Project: write the first blog post&quot;</p>
+                  <p>&quot;Am I spending too much time on StorageAI vs building relationships?&quot;</p>
                 </div>
               </div>
             </div>
@@ -253,7 +287,11 @@ export default function ChatPage() {
                         <div key={i} className="flex items-center gap-2 text-xs">
                           <div className="flex-1 bg-white/[0.03] rounded-lg p-2">
                             <span className="text-foreground/70">
-                              {action.leverName}: <span className="font-mono text-accent">{action.field}</span> &rarr; <span className="font-mono font-bold">{String(action.value)}</span>
+                              {action.type === 'create_task' ? (
+                                <>{action.leverName}: <span className="font-mono text-accent">new task</span> &rarr; <span className="font-mono font-bold">{action.taskName}</span>{action.taskDue && <span className="text-muted/50 ml-1">(due {action.taskDue})</span>}</>
+                              ) : (
+                                <>{action.leverName}: <span className="font-mono text-accent">{action.field}</span> &rarr; <span className="font-mono font-bold">{String(action.value)}</span></>
+                              )}
                             </span>
                           </div>
                           {action.applied ? (
@@ -321,7 +359,7 @@ export default function ChatPage() {
             </motion.button>
           </div>
           <p className="text-[10px] text-muted/30 mt-2 text-center font-mono">
-            The advisor can suggest changes to your levers. Click &quot;Apply&quot; to update your data.
+            Hypatia can suggest lever changes and create tasks. Click &quot;Apply&quot; to update your data.
           </p>
         </div>
       </div>

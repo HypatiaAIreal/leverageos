@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lever, FulcrumStatus } from '@/lib/types';
-import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations, saveReview, getReviews, generateId, getLanguage } from '@/lib/store';
+import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations, saveReview, getReviews, generateId, getLanguage, getProjects } from '@/lib/store';
 import { SavedReview } from '@/lib/types';
 import Link from 'next/link';
 import { useOnboarding, OnboardingModal } from '@/components/Onboarding';
@@ -53,6 +53,7 @@ export default function DashboardPage() {
     localStorage.removeItem('leverageos_milestones');
     localStorage.removeItem('leverageos_reviews');
     localStorage.removeItem('leverageos_chat');
+    localStorage.removeItem('leverageos_projects');
     setLevers([]);
     setShowClearConfirm(false);
   };
@@ -214,6 +215,9 @@ export default function DashboardPage() {
         />
       )}
 
+      {/* Strategic Health Panel */}
+      {levers.length > 0 && <StrategicHealthPanel levers={levers} />}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lever Portfolio - takes 2 cols */}
         <div className="lg:col-span-2 bg-surface rounded-xl border border-white/5 p-6">
@@ -287,7 +291,7 @@ export default function DashboardPage() {
         {/* Right column: This Week + Alerts */}
         <div className="space-y-6">
           {/* This Week Panel - AI Review */}
-          <WeeklyReviewPanel levers={levers} />
+          <WeeklyReviewPanel levers={levers} materialScore={materialHealth.score} epistemicScore={epistemicHealth.score} relationalScore={relationalHealth.score} />
 
           {/* Alert Panel */}
           <div className="bg-surface rounded-xl border border-white/5 p-6">
@@ -328,9 +332,181 @@ export default function DashboardPage() {
   );
 }
 
+function StrategicHealthPanel({ levers }: { levers: Lever[] }) {
+  const projects = getProjects();
+  if (projects.length === 0) return null;
+
+  // Tasks per lever
+  const leverTaskCounts: Record<string, { name: string; total: number; done: number }> = {};
+  projects.forEach((p) => {
+    if (!leverTaskCounts[p.leverId]) {
+      leverTaskCounts[p.leverId] = { name: p.leverName, total: 0, done: 0 };
+    }
+    p.subtasks.forEach((s) => {
+      leverTaskCounts[p.leverId].total++;
+      if (s.done) leverTaskCounts[p.leverId].done++;
+    });
+    // Count the project itself as a task unit
+    leverTaskCounts[p.leverId].total++;
+    if (p.status === 'done') leverTaskCounts[p.leverId].done++;
+  });
+
+  const entries = Object.entries(leverTaskCounts);
+  const maxTasks = Math.max(...entries.map(([, v]) => v.total), 1);
+
+  // Overdue projects
+  const overdueProjects = projects.filter((p) => {
+    if (p.status === 'done') return false;
+    if (p.dueDate && new Date(p.dueDate) < new Date()) return true;
+    return p.subtasks.some((s) => !s.done && s.dueDate && new Date(s.dueDate) < new Date());
+  });
+
+  // Imbalance detector
+  const imbalances: string[] = [];
+  const sortedEntries = [...entries].sort((a, b) => b[1].total - a[1].total);
+  if (sortedEntries.length >= 2) {
+    const top = sortedEntries[0];
+    const bottom = sortedEntries[sortedEntries.length - 1];
+    if (top[1].total > 0 && bottom[1].total === 0) {
+      imbalances.push(`You have ${top[1].total} tasks for ${top[1].name} but 0 for ${bottom[1].name}`);
+    } else if (top[1].total >= bottom[1].total * 4 && bottom[1].total > 0) {
+      imbalances.push(`${top[1].name} has ${top[1].total} tasks vs ${bottom[1].name} with only ${bottom[1].total}`);
+    }
+  }
+
+  // Levers with no projects
+  const leversWithoutProjects = levers.filter((l) => !leverTaskCounts[l.id]);
+  if (leversWithoutProjects.length > 0 && entries.length > 0) {
+    leversWithoutProjects.forEach((l) => {
+      imbalances.push(`${l.name} has no projects or tasks assigned`);
+    });
+  }
+
+  // Sequence alignment: check if spending tasks on levers with weak fulcrums
+  const sequenceWarnings: string[] = [];
+  projects.forEach((p) => {
+    if (p.status === 'done') return;
+    const lever = levers.find((l) => l.id === p.leverId);
+    if (!lever) return;
+    if (lever.fulcrums.material.status === 'absent' || lever.fulcrums.material.status === 'at_risk') {
+      if (lever.fulcrums.relational.status === 'verified' || lever.fulcrums.relational.status === 'assumed') {
+        sequenceWarnings.push(`${lever.name}: building relational tasks while material fulcrum is ${lever.fulcrums.material.status}`);
+      }
+    }
+  });
+
+  // Momentum: completed tasks in current projects
+  const totalSubtasks = projects.reduce((sum, p) => sum + p.subtasks.length, 0);
+  const doneSubtasks = projects.reduce((sum, p) => sum + p.subtasks.filter((s) => s.done).length, 0);
+  const completionRate = totalSubtasks > 0 ? Math.round((doneSubtasks / totalSubtasks) * 100) : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface rounded-xl border border-white/5 p-6"
+    >
+      <h2 className="font-heading text-sm font-semibold text-muted mb-4 uppercase tracking-wider">Strategic Health</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Task Allocation */}
+        <div>
+          <p className="text-[10px] font-mono text-muted uppercase tracking-wider mb-3">Task Allocation</p>
+          <div className="space-y-2">
+            {entries.map(([id, data]) => (
+              <div key={id} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-foreground/70 truncate">{data.name}</span>
+                  <span className="font-mono text-muted">{data.total}</span>
+                </div>
+                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-accent rounded-full transition-all"
+                    style={{ width: `${(data.total / maxTasks) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Momentum */}
+        <div>
+          <p className="text-[10px] font-mono text-muted uppercase tracking-wider mb-3">Momentum</p>
+          <div className="text-center py-2">
+            <span className={`font-mono text-3xl font-bold ${completionRate >= 70 ? 'text-verified' : completionRate >= 40 ? 'text-assumed' : 'text-at-risk'}`}>
+              {completionRate}%
+            </span>
+            <p className="text-[10px] text-muted mt-1">{doneSubtasks}/{totalSubtasks} subtasks completed</p>
+            <p className="text-[10px] text-muted">{projects.filter((p) => p.status === 'done').length}/{projects.length} projects done</p>
+          </div>
+        </div>
+
+        {/* Alerts */}
+        <div>
+          <p className="text-[10px] font-mono text-muted uppercase tracking-wider mb-3">Execution Alerts</p>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {overdueProjects.length > 0 && overdueProjects.map((p) => (
+              <div key={p.id} className="flex items-start gap-2 p-2 bg-at-risk/5 border border-at-risk/20 rounded-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-at-risk mt-1 shrink-0" />
+                <p className="text-[10px] text-at-risk">{p.name}: overdue</p>
+              </div>
+            ))}
+            {sequenceWarnings.map((w, i) => (
+              <div key={`sw-${i}`} className="flex items-start gap-2 p-2 bg-assumed/5 border border-assumed/20 rounded-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-assumed mt-1 shrink-0" />
+                <p className="text-[10px] text-assumed">{w}</p>
+              </div>
+            ))}
+            {imbalances.map((w, i) => (
+              <div key={`im-${i}`} className="flex items-start gap-2 p-2 bg-epistemic/5 border border-epistemic/20 rounded-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-epistemic mt-1 shrink-0" />
+                <p className="text-[10px] text-epistemic">{w}</p>
+              </div>
+            ))}
+            {overdueProjects.length === 0 && sequenceWarnings.length === 0 && imbalances.length === 0 && (
+              <p className="text-[10px] text-verified text-center py-2">All clear. No execution alerts.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function generateReviewsPDF(reviews: SavedReview[]) {
+  const html = `<!DOCTYPE html><html><head><title>LeverageOS Review History</title>
+<style>body{font-family:'Helvetica Neue',sans-serif;background:#0a0a0f;color:#e8e4df;padding:40px;max-width:800px;margin:0 auto}
+h1{color:#c4a35a;font-size:24px;border-bottom:1px solid #333;padding-bottom:10px}
+.review{border:1px solid #222;border-radius:8px;padding:16px;margin:16px 0;background:#12121a}
+.date{color:#6a6570;font-size:11px;font-family:monospace}
+.label{color:#6a6570;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:8px}
+.value{font-size:13px;margin:2px 0 8px}
+.scores{display:flex;gap:16px;margin-top:8px}
+.score-box{padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace}
+.material{background:#1D9E7520;color:#1D9E75}.epistemic{background:#378ADD20;color:#378ADD}.relational{background:#D85A3020;color:#D85A30}
+@media print{body{background:white;color:#333}h1{color:#333}.review{border-color:#ddd;background:#f9f9f9}}
+</style></head><body>
+<h1>LeverageOS — Review History</h1>
+<p style="color:#6a6570;font-size:12px">Generated ${new Date().toLocaleDateString()} — The Invisible Fulcrum (Garcia Bach & Hypatia, 2026)</p>
+${reviews.map((r) => `<div class="review">
+<div class="date">${new Date(r.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date(r.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+${r.materialScore !== undefined ? `<div class="scores"><span class="score-box material">Material ${r.materialScore}%</span><span class="score-box epistemic">Epistemic ${r.epistemicScore}%</span><span class="score-box relational">Relational ${r.relationalScore}%</span></div>` : ''}
+<div class="label">Quick Win</div><div class="value">${r.quickWin}</div>
+<div class="label">Bottleneck</div><div class="value">${r.bottleneck}</div>
+${r.sequenceAlerts.length > 0 ? `<div class="label" style="color:#ef4444">Sequence Alerts</div>${r.sequenceAlerts.map((a) => `<div class="value" style="color:#ef444499">• ${a}</div>`).join('')}` : ''}
+${r.fulcrumTraps.length > 0 ? `<div class="label" style="color:#f59e0b">Fulcrum Traps</div>${r.fulcrumTraps.map((t) => `<div class="value" style="color:#f59e0b99">• ${t}</div>`).join('')}` : ''}
+<div class="label" style="color:#22c55e">Celebration</div><div class="value">${r.celebration}</div>
+</div>`).join('')}
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); w.print(); }
+}
+
 function ReviewHistoryPanel() {
   const [reviews, setReviews] = useState<SavedReview[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showChart, setShowChart] = useState(false);
 
   useEffect(() => {
     setReviews(getReviews());
@@ -347,12 +523,55 @@ function ReviewHistoryPanel() {
     if (count >= 2) trendMap[fulcrum] = count;
   });
 
+  // Evolution chart data (reverse so oldest first)
+  const chartData = [...reviews]
+    .filter((r) => r.materialScore !== undefined)
+    .reverse()
+    .map((r) => ({
+      date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      Material: r.materialScore || 0,
+      Epistemic: r.epistemicScore || 0,
+      Relational: r.relationalScore || 0,
+    }));
+
   return (
     <div className="bg-surface rounded-xl border border-white/5 p-6">
-      <h2 className="font-heading text-xl font-semibold mb-4 flex items-center gap-2">
-        Review History
-        <span className="text-xs text-muted font-mono">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</span>
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-heading text-xl font-semibold flex items-center gap-2">
+          Review History
+          <span className="text-xs text-muted font-mono">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</span>
+        </h2>
+        <div className="flex items-center gap-2">
+          {chartData.length >= 2 && (
+            <button
+              onClick={() => setShowChart(!showChart)}
+              className="px-2 py-1 text-[10px] text-muted border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              {showChart ? 'Hide Chart' : 'Evolution'}
+            </button>
+          )}
+          <button
+            onClick={() => generateReviewsPDF(reviews)}
+            className="px-2 py-1 text-[10px] text-muted border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+          >
+            Export PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Evolution Chart */}
+      <AnimatePresence>
+        {showChart && chartData.length >= 2 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="mb-4"
+          >
+            <ReviewEvolutionChart data={chartData} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Trend indicators */}
       {Object.keys(trendMap).length > 0 && (
@@ -389,6 +608,13 @@ function ReviewHistoryPanel() {
                     <span className="text-xs text-muted/50">
                       {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                    {review.materialScore !== undefined && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-material">{review.materialScore}%</span>
+                        <span className="text-[10px] font-mono text-epistemic">{review.epistemicScore}%</span>
+                        <span className="text-[10px] font-mono text-relational">{review.relationalScore}%</span>
+                      </div>
+                    )}
                   </div>
                   <svg className={`w-4 h-4 text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -441,6 +667,50 @@ function ReviewHistoryPanel() {
             </motion.div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ReviewEvolutionChart({ data }: { data: { date: string; Material: number; Epistemic: number; Relational: number }[] }) {
+  // Dynamic import to avoid SSR issues — use a simple CSS-based chart
+  return (
+    <div className="bg-white/[0.02] rounded-lg p-4">
+      <p className="text-[10px] font-mono text-muted uppercase tracking-wider mb-3">Fulcrum Score Evolution</p>
+      <div className="flex items-end gap-1 h-32">
+        {data.map((point, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+            <div className="w-full flex flex-col gap-0.5" style={{ height: '100px' }}>
+              <div className="flex-1 flex items-end">
+                <div className="w-full bg-material/40 rounded-t-sm" style={{ height: `${point.Material}%` }} title={`Material: ${point.Material}%`} />
+              </div>
+            </div>
+            <span className="text-[8px] text-muted/40 font-mono truncate w-full text-center">{point.date}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-end gap-1 h-24 mt-2">
+        {data.map((point, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+            <div className="w-full flex gap-px" style={{ height: '80px' }}>
+              <div className="flex-1 flex items-end">
+                <div className="w-full bg-material/60 rounded-t-sm" style={{ height: `${point.Material}%` }} />
+              </div>
+              <div className="flex-1 flex items-end">
+                <div className="w-full bg-epistemic/60 rounded-t-sm" style={{ height: `${point.Epistemic}%` }} />
+              </div>
+              <div className="flex-1 flex items-end">
+                <div className="w-full bg-relational/60 rounded-t-sm" style={{ height: `${point.Relational}%` }} />
+              </div>
+            </div>
+            <span className="text-[8px] text-muted/40 font-mono truncate w-full text-center">{point.date}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-4 mt-2 justify-center">
+        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-material" /><span className="text-[10px] text-muted">Material</span></div>
+        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-epistemic" /><span className="text-[10px] text-muted">Epistemic</span></div>
+        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-relational" /><span className="text-[10px] text-muted">Relational</span></div>
       </div>
     </div>
   );
@@ -612,7 +882,7 @@ interface ReviewData {
   celebration: string;
 }
 
-function WeeklyReviewPanel({ levers }: { levers: Lever[] }) {
+function WeeklyReviewPanel({ levers, materialScore, epistemicScore, relationalScore }: { levers: Lever[]; materialScore: number; epistemicScore: number; relationalScore: number }) {
   const [review, setReview] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -634,10 +904,13 @@ function WeeklyReviewPanel({ levers }: { levers: Lever[] }) {
       }
       const data = await res.json();
       setReview(data);
-      // Save to review history
+      // Save to review history with fulcrum scores
       const saved: SavedReview = {
         id: generateId(),
         date: new Date().toISOString(),
+        materialScore,
+        epistemicScore,
+        relationalScore,
         ...data,
       };
       saveReview(saved);
