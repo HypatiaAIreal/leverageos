@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lever, FulcrumStatus } from '@/lib/types';
-import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations, saveReview, getReviews, generateId, getLanguage, getProjects } from '@/lib/store';
+import { getLevers, loadSampleData, loadCarlesPortfolio, detectSequenceViolations, saveReview, getReviews, generateId, getLanguage, getProjects, exportAllData, importAllData } from '@/lib/store';
 import { SavedReview } from '@/lib/types';
 import Link from 'next/link';
 import { useOnboarding, OnboardingModal } from '@/components/Onboarding';
-import DataPortability from '@/components/DataPortability';
 import PageTransition from '@/components/PageTransition';
 import { generateLeverageReport } from '@/components/LeverageReport';
 
@@ -30,6 +29,8 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'category'>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showLoadChoice, setShowLoadChoice] = useState<'sample' | 'carles' | null>(null);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const { showOnboarding, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
@@ -38,14 +39,38 @@ export default function DashboardPage() {
 
   const refreshLevers = () => setLevers(getLevers());
 
-  const handleLoadSample = () => {
-    const samples = loadSampleData();
-    setLevers(samples);
+  const handleLoad = (type: 'sample' | 'carles', addToExisting: boolean) => {
+    if (type === 'sample') {
+      setLevers(loadSampleData(addToExisting));
+    } else {
+      setLevers(loadCarlesPortfolio(addToExisting));
+    }
+    setShowLoadChoice(null);
   };
 
-  const handleLoadCarles = () => {
-    const portfolio = loadCarlesPortfolio();
-    setLevers(portfolio);
+  const handleExportAll = () => {
+    const json = exportAllData();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leverageos-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = importAllData(ev.target?.result as string);
+      setImportStatus({ type: result.success ? 'success' : 'error', msg: result.message });
+      if (result.success) refreshLevers();
+      setTimeout(() => setImportStatus(null), 4000);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleClearAll = () => {
@@ -114,88 +139,170 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {levers.length > 0 && (
-            <>
-              <motion.button
-                onClick={() => generateLeverageReport(levers)}
-                className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Print Report
-              </motion.button>
+            <motion.button
+              onClick={() => generateLeverageReport(levers)}
+              className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Print Report
+            </motion.button>
+          )}
+        </div>
+      </div>
+
+      {/* Data Management Bar */}
+      <div className="bg-surface rounded-xl border border-white/5 p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-muted uppercase tracking-wider">Data</span>
+            <motion.button
+              onClick={() => levers.length > 0 ? setShowLoadChoice('carles') : handleLoad('carles', false)}
+              className="px-3 py-1.5 bg-accent/10 text-accent border border-accent/20 rounded-lg text-xs font-medium hover:bg-accent/20 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              My Portfolio
+            </motion.button>
+            <motion.button
+              onClick={() => levers.length > 0 ? setShowLoadChoice('sample') : handleLoad('sample', false)}
+              className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Demo Data
+            </motion.button>
+            {levers.length > 0 && (
               <motion.button
                 onClick={() => setShowClearConfirm(true)}
                 className="px-3 py-1.5 bg-at-risk/5 text-at-risk/70 border border-at-risk/20 rounded-lg text-xs font-medium hover:bg-at-risk/10 hover:text-at-risk transition-colors"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                Clear All Data
+                Clear All
               </motion.button>
-            </>
-          )}
-          <DataPortability onImport={refreshLevers} />
-          {levers.length === 0 && (
-            <>
-              <motion.button
-                onClick={handleLoadCarles}
-                className="px-4 py-2 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                My Portfolio
-              </motion.button>
-              <motion.button
-                onClick={handleLoadSample}
-                className="px-4 py-2 bg-white/5 text-muted border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Demo Data
-              </motion.button>
-            </>
-          )}
-        </div>
-
-        {/* Clear All Confirmation Dialog */}
-        <AnimatePresence>
-          {showClearConfirm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-              onClick={() => setShowClearConfirm(false)}
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <motion.button
+              onClick={handleExportAll}
+              className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-surface border border-white/10 rounded-xl p-6 max-w-sm w-full"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="font-heading text-lg font-semibold text-foreground mb-2">Clear All Data?</h3>
-                <p className="text-sm text-muted mb-6">Are you sure? This will delete all levers and reviews. This action cannot be undone.</p>
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => setShowClearConfirm(false)}
-                    className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    onClick={handleClearAll}
-                    className="px-4 py-2 bg-at-risk text-white rounded-lg text-sm font-medium hover:bg-at-risk/80 transition-colors"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Delete Everything
-                  </motion.button>
-                </div>
-              </motion.div>
-            </motion.div>
+              Export All
+            </motion.button>
+            <label className="px-3 py-1.5 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors cursor-pointer">
+              Import
+              <input type="file" accept=".json" className="hidden" onChange={handleImportAll} />
+            </label>
+          </div>
+        </div>
+        <AnimatePresence>
+          {importStatus && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className={`text-xs mt-2 ${importStatus.type === 'success' ? 'text-verified' : 'text-at-risk'}`}
+            >
+              {importStatus.msg}
+            </motion.p>
           )}
         </AnimatePresence>
       </div>
+
+      {/* Load Choice Dialog */}
+      <AnimatePresence>
+        {showLoadChoice && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setShowLoadChoice(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-surface border border-white/10 rounded-xl p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-heading text-lg font-semibold text-foreground mb-2">
+                Load {showLoadChoice === 'carles' ? 'My Portfolio' : 'Demo Data'}
+              </h3>
+              <p className="text-sm text-muted mb-6">You already have {levers.length} lever{levers.length !== 1 ? 's' : ''}. How would you like to load?</p>
+              <div className="flex flex-col gap-2">
+                <motion.button
+                  onClick={() => handleLoad(showLoadChoice!, true)}
+                  className="px-4 py-2.5 bg-accent/20 text-accent border border-accent/30 rounded-lg text-sm font-medium hover:bg-accent/30 transition-colors text-left"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Add to existing
+                  <span className="block text-[10px] text-accent/60 mt-0.5">Keep current levers and add new ones</span>
+                </motion.button>
+                <motion.button
+                  onClick={() => handleLoad(showLoadChoice!, false)}
+                  className="px-4 py-2.5 bg-white/5 text-muted border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 hover:text-foreground transition-colors text-left"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Replace all
+                  <span className="block text-[10px] text-muted/50 mt-0.5">Remove existing levers and load fresh</span>
+                </motion.button>
+                <button
+                  onClick={() => setShowLoadChoice(null)}
+                  className="text-muted text-xs mt-1 hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Clear All Confirmation Dialog */}
+      <AnimatePresence>
+        {showClearConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setShowClearConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-surface border border-white/10 rounded-xl p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-heading text-lg font-semibold text-foreground mb-2">Clear All Data?</h3>
+              <p className="text-sm text-muted mb-6">This will delete all levers, projects, reviews, and chat history. This action cannot be undone.</p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  onClick={handleClearAll}
+                  className="px-4 py-2 bg-at-risk text-white rounded-lg text-sm font-medium hover:bg-at-risk/80 transition-colors"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Delete Everything
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Fulcrum Health Panel */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">

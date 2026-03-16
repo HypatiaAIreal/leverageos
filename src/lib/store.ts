@@ -75,7 +75,7 @@ export function detectSequenceViolations(lever: Lever): string[] {
   return violations;
 }
 
-export function loadSampleData(): Lever[] {
+export function loadSampleData(addToExisting = false): Lever[] {
   const now = new Date().toISOString();
   const samples: Lever[] = [
     {
@@ -160,11 +160,17 @@ export function loadSampleData(): Lever[] {
     },
   ];
 
+  if (addToExisting) {
+    const existing = getLevers();
+    const combined = [...existing, ...samples];
+    saveLevers(combined);
+    return combined;
+  }
   saveLevers(samples);
   return samples;
 }
 
-export function loadCarlesPortfolio(): Lever[] {
+export function loadCarlesPortfolio(addToExisting = false): Lever[] {
   const now = new Date().toISOString();
   const levers: Lever[] = [
     {
@@ -249,8 +255,61 @@ export function loadCarlesPortfolio(): Lever[] {
     },
   ];
 
+  if (addToExisting) {
+    const existing = getLevers();
+    const combined = [...existing, ...levers];
+    saveLevers(combined);
+    return combined;
+  }
   saveLevers(levers);
   return levers;
+}
+
+// Full data export/import
+export function exportAllData(): string {
+  const data: Record<string, unknown> = {
+    version: 2,
+    exportDate: new Date().toISOString(),
+    levers: getLevers(),
+    projects: getProjects(),
+    reviews: getReviews(),
+    chat: getChatMessages(),
+    milestones: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('leverageos_milestones') || '[]') : [],
+    language: getLanguage(),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+export function importAllData(json: string): { success: boolean; message: string } {
+  try {
+    const data = JSON.parse(json);
+    if (data.levers && Array.isArray(data.levers)) {
+      saveLevers(data.levers);
+    }
+    if (data.projects && Array.isArray(data.projects)) {
+      saveProjects(data.projects);
+    }
+    if (data.reviews && Array.isArray(data.reviews)) {
+      localStorage.setItem(REVIEWS_KEY, JSON.stringify(data.reviews));
+    }
+    if (data.chat && Array.isArray(data.chat)) {
+      saveChatMessages(data.chat);
+    }
+    if (data.milestones) {
+      localStorage.setItem('leverageos_milestones', JSON.stringify(data.milestones));
+    }
+    if (data.language) {
+      setLanguage(data.language);
+    }
+    const counts = [];
+    if (data.levers?.length) counts.push(`${data.levers.length} levers`);
+    if (data.projects?.length) counts.push(`${data.projects.length} projects`);
+    if (data.reviews?.length) counts.push(`${data.reviews.length} reviews`);
+    if (data.chat?.length) counts.push(`${data.chat.length} messages`);
+    return { success: true, message: `Imported: ${counts.join(', ')}` };
+  } catch (err: unknown) {
+    return { success: false, message: err instanceof Error ? err.message : 'Invalid JSON file' };
+  }
 }
 
 // Review History

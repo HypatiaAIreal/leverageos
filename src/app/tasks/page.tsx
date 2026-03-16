@@ -3,9 +3,67 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project, Subtask, ProjectStatus, Lever } from '@/lib/types';
-import { getLevers, getProjects, saveProject, deleteProject, generateId } from '@/lib/store';
+import { getLevers, getProjects, saveProject, deleteProject, generateId, getLanguage } from '@/lib/store';
 import Link from 'next/link';
 import PageTransition from '@/components/PageTransition';
+
+function generateStarterProjects(levers: Lever[]): Project[] {
+  const starters: Project[] = [];
+  const now = new Date().toISOString();
+
+  levers.forEach((lever) => {
+    // Find weakest fulcrum
+    const fulcrumScores = {
+      material: { verified: 3, assumed: 2, at_risk: 1, absent: 0 }[lever.fulcrums.material.status],
+      epistemic: { verified: 3, assumed: 2, at_risk: 1, absent: 0 }[lever.fulcrums.epistemic.status],
+      relational: { verified: 3, assumed: 2, at_risk: 1, absent: 0 }[lever.fulcrums.relational.status],
+    };
+
+    const weakest = Object.entries(fulcrumScores).sort(([,a], [,b]) => a - b)[0][0] as 'material' | 'epistemic' | 'relational';
+
+    const subtaskSuggestions: Record<string, { name: string; notes: string }[]> = {
+      material: [
+        { name: 'Review financial runway for this lever', notes: 'Check bank statements, calculate monthly costs' },
+        { name: 'Identify revenue/funding sources', notes: 'List all income streams that support this lever' },
+        { name: 'Create 6-month sustainability plan', notes: 'What needs to be true financially for this to survive?' },
+      ],
+      epistemic: [
+        { name: 'Gather external validation evidence', notes: 'Testimonials, reviews, metrics, third-party mentions' },
+        { name: 'Publish or share proof of work', notes: 'Blog post, case study, portfolio piece, or demo' },
+        { name: 'Request peer feedback or review', notes: 'Ask 2-3 people in the field for honest assessment' },
+      ],
+      relational: [
+        { name: 'Identify key audience or stakeholders', notes: 'Who needs to know about and trust this lever?' },
+        { name: 'Reach out to 3 potential advocates', notes: 'Email, DM, or meet people who can amplify this' },
+        { name: 'Create a public-facing artifact', notes: 'Blog post, social thread, talk, or newsletter about this work' },
+      ],
+    };
+
+    const subs = subtaskSuggestions[weakest].slice(0, 3).map((s) => ({
+      id: generateId(),
+      name: s.name,
+      done: false,
+      notes: s.notes,
+      dueDate: null,
+    }));
+
+    const fulcrumLabel = weakest.charAt(0).toUpperCase() + weakest.slice(1);
+    starters.push({
+      id: generateId(),
+      name: `Strengthen ${fulcrumLabel} Fulcrum`,
+      description: `The ${fulcrumLabel} fulcrum for "${lever.name}" is the weakest (${lever.fulcrums[weakest].status}). Focus here first.`,
+      leverId: lever.id,
+      leverName: lever.name,
+      dueDate: null,
+      status: 'not_started',
+      subtasks: subs,
+      created: now,
+    });
+  });
+
+  return starters;
+}
+
 
 const statusLabels: Record<ProjectStatus, string> = {
   not_started: 'Not Started',
@@ -25,15 +83,70 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false);
   const [sortBy, setSortBy] = useState<'due' | 'lever'>('due');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
-    setProjects(getProjects());
-    setLevers(getLevers());
+    const stored = getProjects();
+    const storedLevers = getLevers();
+    setLevers(storedLevers);
+
+    // Auto-generate starter projects if none exist and levers do
+    if (stored.length === 0 && storedLevers.length > 0) {
+      const starters = generateStarterProjects(storedLevers);
+      starters.forEach((p) => saveProject(p));
+      setProjects(getProjects());
+    } else {
+      setProjects(stored);
+    }
   }, []);
 
   const refresh = () => {
     setProjects(getProjects());
     setLevers(getLevers());
+  };
+
+  const handleGenerateTasks = async () => {
+    if (levers.length === 0 || generating) return;
+    setGenerating(true);
+    try {
+      const lang = getLanguage();
+      const res = await fetch('/api/generate-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ levers, existingProjects: projects, lang }),
+      });
+      if (!res.ok) throw new Error('Failed to generate tasks');
+      const data = await res.json();
+      if (data.projects && Array.isArray(data.projects)) {
+        data.projects.forEach((p: { leverIndex: number; name: string; description: string; subtasks: { name: string; notes: string }[] }) => {
+          const lever = levers[p.leverIndex];
+          if (!lever) return;
+          const project: Project = {
+            id: generateId(),
+            name: p.name,
+            description: p.description || '',
+            leverId: lever.id,
+            leverName: lever.name,
+            dueDate: null,
+            status: 'not_started',
+            subtasks: (p.subtasks || []).map((s: { name: string; notes: string }) => ({
+              id: generateId(),
+              name: s.name,
+              done: false,
+              notes: s.notes || '',
+              dueDate: null,
+            })),
+            created: new Date().toISOString(),
+          };
+          saveProject(project);
+        });
+        refresh();
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleNewProject = () => {
@@ -158,6 +271,15 @@ export default function TasksPage() {
                 By Lever
               </button>
             </div>
+            <motion.button
+              onClick={handleGenerateTasks}
+              disabled={levers.length === 0 || generating}
+              className="px-3 py-2 bg-white/5 text-muted border border-white/10 rounded-lg text-xs font-medium hover:bg-white/10 hover:text-foreground transition-colors disabled:opacity-30"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {generating ? 'Generating...' : 'AI Generate Tasks'}
+            </motion.button>
             <motion.button
               onClick={handleNewProject}
               disabled={levers.length === 0}
